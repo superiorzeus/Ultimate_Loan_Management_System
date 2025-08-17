@@ -78,3 +78,23 @@ class LoanType(models.Model):
 
     def __str__(self):
         return self.name
+
+# Loan Application Model
+# This model stores a customer's loan request.
+class LoanApplication(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    # A foreign key to the User who submitted the application
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # A foreign key to the type of loan being applied for
+    loan_type = models.ForeignKey(LoanType, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Loan application by {self.user.username} for {self.loan_type.name}"
