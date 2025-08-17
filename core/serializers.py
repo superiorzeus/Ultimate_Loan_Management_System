@@ -1,52 +1,93 @@
 from rest_framework import serializers
-from .models import LoanType, User, CustomerProfile, LoanApplication, Loan, Payment
+from .models import User, CustomerProfile, LoanApplication, Loan, Payment, LoanType
+from django.db import transaction
 
-# This serializer is used to manage LoanType objects.
-# It handles the conversion of LoanType model instances to and from JSON.
+# A serializer for the LoanType model.
 class LoanTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LoanType
         fields = '__all__'
 
-# This serializer is used to manage LoanApplication objects.
-# It handles the conversion of LoanApplication model instances to and from JSON.
-class LoanApplicationSerializer(serializers.Serializer):
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
-    loan_type = serializers.PrimaryKeyRelatedField(queryset=LoanType.objects.all())
-    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    status = serializers.CharField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-
-    def create(self, validated_data):
-        # The user is added from the request, not the request body
-        validated_data['user'] = self.context['request'].user
-        return LoanApplication.objects.create(**validated_data)
-
-    def update(self, instance, validated_data):
-        # We only allow the status to be changed for admin users
-        if self.context['request'].user.is_admin:
-            instance.status = validated_data.get('status', instance.status)
-            instance.save()
-        return instance
-
-# This serializer is used for the Loan model.
-class LoanSerializer(serializers.ModelSerializer):
-    # The application is a read-only field since a loan is created from an application.
-    application = serializers.PrimaryKeyRelatedField(read_only=True)
-    # The balance is read-only as it will be calculated automatically.
-    balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-
-    class Meta:
-        model = Loan
-        fields = '__all__'
-
-# This serializer is used for the Payment model.
+# A serializer for the Payment model.
 class PaymentSerializer(serializers.ModelSerializer):
-    # The loan is a read-only field since it's an FK to a loan.
-    loan = serializers.PrimaryKeyRelatedField(read_only=True)
-    # The payment date is read-only as it's set automatically.
-    payment_date = serializers.DateTimeField(read_only=True)
-
     class Meta:
         model = Payment
-        fields = '__all__'
+        fields = ['amount_paid', 'payment_date']
+        read_only_fields = ['payment_date']
+
+
+# A serializer for the Loan model. It includes a nested Payments field.
+class LoanSerializer(serializers.ModelSerializer):
+    payments = PaymentSerializer(many=True, read_only=True)
+    loan_type = serializers.CharField(source='application.loan_type.name')
+    term_months = serializers.IntegerField(source='application.loan_type.term_months')
+    
+    class Meta:
+        model = Loan
+        fields = [
+            'amount', 'interest_rate', 'term_months', 'balance', 
+            'disbursed', 'disbursement_date', 'start_date', 'end_date', 'payments', 'loan_type'
+        ]
+
+
+# A serializer for the LoanApplication model.
+class LoanApplicationSerializer(serializers.ModelSerializer):
+    loan_type = serializers.PrimaryKeyRelatedField(queryset=LoanType.objects.all())
+    loan = LoanSerializer(read_only=True)
+
+    class Meta:
+        model = LoanApplication
+        fields = ['id', 'user', 'loan_type', 'amount', 'status', 'created_at', 'loan']
+        read_only_fields = ['user', 'status', 'created_at']
+
+
+# A serializer for creating and updating the User model.
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username', 'phone_number', 'name', 'is_customer', 'is_admin', 'is_staff', 'password']
+        extra_kwargs = {'password': {'write_only': True}}
+    
+    # We will override the create method to make sure the password gets hashed correctly.
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            phone_number=validated_data['phone_number'],
+            name=validated_data['name'],
+            password=validated_data['password']
+        )
+        return user
+
+
+# A serializer for the CustomerProfile model.
+class CustomerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerProfile
+        fields = ['national_id', 'email', 'address', 'digital_address', 'national_id_front_scan', 'national_id_back_scan']
+
+
+# This serializer combines both User and CustomerProfile.
+class CustomerDetailSerializer(serializers.ModelSerializer):
+    profile = CustomerProfileSerializer(required=False)
+
+    class Meta:
+        model = User
+        fields = ['username', 'phone_number', 'name', 'profile']
+        read_only_fields = ['username', 'phone_number', 'name']
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        # Update User fields
+        instance.name = validated_data.get('name', instance.name)
+        instance.save()
+
+        # Update or create CustomerProfile
+        profile_data = validated_data.pop('profile', None)
+        if profile_data:
+            customer_profile, created = CustomerProfile.objects.get_or_create(user=instance)
+            for attr, value in profile_data.items():
+                setattr(customer_profile, attr, value)
+            customer_profile.save()
+        
+        return instance
+
