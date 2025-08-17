@@ -110,6 +110,8 @@ class Loan(models.Model):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     start_date = models.DateField(auto_now_add=True)
     end_date = models.DateField()
+    disbursed = models.BooleanField(default=False)
+    disbursement_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"Loan for {self.application.user.username} - GHS{self.amount}"
