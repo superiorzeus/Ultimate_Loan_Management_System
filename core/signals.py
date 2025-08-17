@@ -14,12 +14,19 @@ from dateutil.relativedelta import relativedelta
 def create_loan_on_approval(sender, instance, created, **kwargs):
     """
     Automatically creates a Loan instance when a LoanApplication is approved.
+    The total interest is calculated and added to the balance upfront.
     """
     # Check if the application's status is 'approved'
     # We also check if a loan doesn't already exist for this application to prevent duplicates
     if instance.status == 'approved' and not hasattr(instance, 'loan'):
         # Calculate the end date for the loan
         end_date = date.today() + relativedelta(months=+instance.loan_type.term_months)
+        
+        # Calculate the total interest based on the flat rate
+        total_interest = (instance.amount * instance.loan_type.interest_rate) / 100
+        
+        # Calculate the total balance due (principal + total interest)
+        total_balance = instance.amount + total_interest
 
         # Create the new Loan instance
         Loan.objects.create(
@@ -27,8 +34,8 @@ def create_loan_on_approval(sender, instance, created, **kwargs):
             amount=instance.amount,
             interest_rate=instance.loan_type.interest_rate,
             term_months=instance.loan_type.term_months,
-            # Set the initial balance as the approved amount
-            balance=instance.amount,
+            # Set the initial balance with the total interest added
+            balance=total_balance,
             end_date=end_date,
             # Initially, the loan is not yet disbursed
             disbursed=False,
