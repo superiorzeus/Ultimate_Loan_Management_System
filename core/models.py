@@ -98,3 +98,28 @@ class LoanApplication(models.Model):
 
     def __str__(self):
         return f"Loan application by {self.user.username} for {self.loan_type.name}"
+
+# Loan Model
+# This model represents an approved loan with its own details.
+class Loan(models.Model):
+    # A one-to-one relationship with the approved LoanApplication
+    application = models.OneToOneField(LoanApplication, on_delete=models.CASCADE, primary_key=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    interest_rate = models.DecimalField(max_digits=5, decimal_places=2)
+    term_months = models.IntegerField()
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    start_date = models.DateField(auto_now_add=True)
+    end_date = models.DateField()
+
+    def __str__(self):
+        return f"Loan for {self.application.user.username} - GHS{self.amount}"
+
+# Payment Model
+# This model stores all the payments made towards a specific loan.
+class Payment(models.Model):
+    loan = models.ForeignKey(Loan, on_delete=models.CASCADE)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Payment of GHS{self.amount_paid} for loan {self.loan.id}"

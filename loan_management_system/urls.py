@@ -21,8 +21,14 @@ from core import views
 
 # Create a router instance to automatically handle URL routing for the ViewSets.
 router = DefaultRouter()
+# Register the LoanTypeViewSet with the router.
 router.register(r'loantypes', views.LoanTypeViewSet, basename='loantype')
+# Register the LoanApplicationViewSet with the router.
 router.register(r'applications', views.LoanApplicationViewSet, basename='loanapplication')
+# Register the LoanViewSet with the router.
+router.register(r'loans', views.LoanViewSet, basename='loan')
+# Register the PaymentViewSet with the router.
+router.register(r'payments', views.PaymentViewSet, basename='payment')
 
 
 urlpatterns = [

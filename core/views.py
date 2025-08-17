@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .models import LoanType, LoanApplication
-from .serializers import LoanTypeSerializer, LoanApplicationSerializer
+from .models import LoanType, LoanApplication, Loan, Payment
+from .serializers import LoanTypeSerializer, LoanApplicationSerializer, LoanSerializer, PaymentSerializer
 from .permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
 
@@ -25,3 +25,27 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
             return LoanApplication.objects.all()
         # Customers can only view their own loan applications
         return LoanApplication.objects.filter(user=self.request.user)
+
+# A ViewSet for viewing and managing Loan instances.
+class LoanViewSet(viewsets.ModelViewSet):
+    serializer_class = LoanSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Admins can view all loans
+        if self.request.user.is_admin:
+            return Loan.objects.all()
+        # Customers can only view their own loans
+        return Loan.objects.filter(application__user=self.request.user)
+
+# A ViewSet for viewing and managing Payment instances.
+class PaymentViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Admins can view all payments
+        if self.request.user.is_admin:
+            return Payment.objects.all()
+        # Customers can only view payments for their own loans
+        return Payment.objects.filter(loan__application__user=self.request.user)

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import LoanType, User, CustomerProfile, LoanApplication
+from .models import LoanType, User, CustomerProfile, LoanApplication, Loan, Payment
 
 # This serializer is used to manage LoanType objects.
 # It handles the conversion of LoanType model instances to and from JSON.
@@ -28,3 +28,25 @@ class LoanApplicationSerializer(serializers.Serializer):
             instance.status = validated_data.get('status', instance.status)
             instance.save()
         return instance
+
+# This serializer is used for the Loan model.
+class LoanSerializer(serializers.ModelSerializer):
+    # The application is a read-only field since a loan is created from an application.
+    application = serializers.PrimaryKeyRelatedField(read_only=True)
+    # The balance is read-only as it will be calculated automatically.
+    balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = Loan
+        fields = '__all__'
+
+# This serializer is used for the Payment model.
+class PaymentSerializer(serializers.ModelSerializer):
+    # The loan is a read-only field since it's an FK to a loan.
+    loan = serializers.PrimaryKeyRelatedField(read_only=True)
+    # The payment date is read-only as it's set automatically.
+    payment_date = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = '__all__'
