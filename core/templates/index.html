@@ -4,583 +4,371 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loan Management System</title>
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Set a custom font -->
+    <!-- Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
         }
-        /* Modal overlay for the detailed view */
-        .modal-overlay {
+        /* Custom styles for the modal */
+        .modal {
+            display: none; /* Hidden by default */
             position: fixed;
-            top: 0;
+            z-index: 100;
             left: 0;
+            top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
+            overflow: auto;
+            background-color: rgb(0,0,0);
+            background-color: rgba(0,0,0,0.4);
             justify-content: center;
             align-items: center;
-            z-index: 1000;
         }
         .modal-content {
-            background-color: white;
-            padding: 2rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            background-color: #fefefe;
+            padding: 24px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
             width: 90%;
-            max-width: 500px;
-            position: relative;
-            max-height: 90vh; /* Ensure it's not taller than the viewport */
-            overflow-y: auto; /* Allow scrolling for long content */
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        /* Spinner animation for the button */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-    <div id="app" class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-        <!-- Login/Registration Container -->
-        <div id="auth-container">
-            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Welcome</h1>
-
-            <!-- Form Toggle Buttons -->
-            <div class="flex justify-center mb-6">
-                <button id="show-login-btn" class="px-4 py-2 rounded-l-lg font-semibold text-white bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-                    Login
-                </button>
-                <button id="show-register-btn" class="px-4 py-2 rounded-r-lg font-semibold text-blue-600 bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-                    Register
-                </button>
+<body class="flex items-center justify-center min-h-screen">
+    <div id="app" class="bg-white p-8 md:p-12 rounded-xl shadow-lg w-full max-w-md mx-4">
+        <!-- Login/Register Form (Initial View) -->
+        <div id="auth-view" class="space-y-6">
+            <h1 class="text-4xl font-bold text-center text-gray-800">Welcome</h1>
+            <div class="flex justify-center bg-gray-200 rounded-full p-1">
+                <button id="login-tab" class="px-6 py-2 rounded-full font-semibold transition-colors duration-300 bg-blue-600 text-white">Login</button>
+                <button id="register-tab" class="px-6 py-2 rounded-full font-semibold transition-colors duration-300 text-gray-600">Register</button>
             </div>
 
             <!-- Login Form -->
             <form id="login-form" class="space-y-4">
                 <div>
                     <label for="login-username" class="block text-sm font-medium text-gray-700">Username</label>
-                    <input type="text" id="login-username" name="username" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                    <input type="text" id="login-username" name="username" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                 </div>
                 <div>
                     <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="login-password" name="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                    <input type="password" id="login-password" name="password" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                 </div>
-                <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-                    Login
-                </button>
-                <p id="login-message" class="text-center text-sm font-medium"></p>
+                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Login</button>
+                <p id="login-error" class="text-red-500 text-sm text-center"></p>
             </form>
 
-            <!-- Registration Form (initially hidden) -->
-            <form id="register-form" class="space-y-4 hidden">
+            <!-- Register Form (Initially Hidden) -->
+            <form id="register-form" class="space-y-4 hidden" enctype="multipart/form-data">
+                <p class="text-sm text-center text-gray-500">
+                    Registering for an account will set you up as a customer. Your account must be approved by an admin before you can apply for a loan.
+                </p>
                 <div>
                     <label for="register-username" class="block text-sm font-medium text-gray-700">Username</label>
-                    <input type="text" id="register-username" name="username" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                </div>
-                <div>
-                    <label for="register-phone" class="block text-sm font-medium text-gray-700">Phone Number</label>
-                    <input type="tel" id="register-phone" name="phone_number" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                </div>
-                <div>
-                    <label for="register-name" class="block text-sm font-medium text-gray-700">Full Name</label>
-                    <input type="text" id="register-name" name="name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                    <input type="text" id="register-username" name="username" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                 </div>
                 <div>
                     <label for="register-password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="register-password" name="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                    <input type="password" id="register-password" name="password" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                 </div>
-                <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-                    Register
-                </button>
-                <p id="register-message" class="text-center text-sm font-medium"></p>
+                <div>
+                    <label for="register-name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                    <input type="text" id="register-name" name="name" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div>
+                    <label for="register-phone" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    <input type="tel" id="register-phone" name="phone_number" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div>
+                    <label for="register-national-id" class="block text-sm font-medium text-gray-700">National ID</label>
+                    <input type="text" id="register-national-id" name="national_id" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div>
+                    <label for="register-address" class="block text-sm font-medium text-gray-700">Address</label>
+                    <input type="text" id="register-address" name="address" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div>
+                    <label for="register-digital-address" class="block text-sm font-medium text-gray-700">Digital Address</label>
+                    <input type="text" id="register-digital-address" name="digital_address" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div>
+                    <label for="register-national-id-front" class="block text-sm font-medium text-gray-700">National ID Front Scan</label>
+                    <input type="file" id="register-national-id-front" name="national_id_front_scan" class="mt-1 block w-full px-3 py-2" required>
+                </div>
+                <div>
+                    <label for="register-national-id-back" class="block text-sm font-medium text-gray-700">National ID Back Scan</label>
+                    <input type="file" id="register-national-id-back" name="national_id_back_scan" class="mt-1 block w-full px-3 py-2" required>
+                </div>
+                <button type="submit" id="register-btn" class="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Register</button>
+                <p id="register-error" class="text-red-500 text-sm text-center"></p>
             </form>
         </div>
 
-        <!-- Dashboard View (initially hidden) -->
-        <div id="dashboard-container" class="hidden">
-            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Dashboard</h1>
-            <p id="welcome-message" class="text-center text-gray-600 mb-4"></p>
-            
-            <!-- Loan Applications Section -->
-            <div id="loan-section" class="mb-6">
-                <h2 class="text-xl font-semibold mb-2">My Loan Applications</h2>
-                <div id="loan-list" class="space-y-2">
-                    <!-- Loan applications will be dynamically added here -->
-                    <p class="text-gray-500 text-sm">Loading applications...</p>
+        <!-- Admin Dashboard (Initially Hidden) -->
+        <div id="admin-view" class="hidden">
+            <h1 class="text-4xl font-bold text-center text-gray-800">Admin Dashboard</h1>
+            <p class="text-center text-gray-600 mt-2">Welcome, Admin!</p>
+            <div class="mt-6">
+                <button onclick="handleLogout()" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">Logout</button>
+            </div>
+            <!-- More admin features will be added here -->
+            <div id="admin-dashboard-content" class="mt-8">
+                <div class="space-y-4">
+                    <a href="#" class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow">Manage Loan Applications</a>
+                    <a href="#" class="block w-full text-center bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow">Manage Loan Types</a>
+                    <a href="#" class="block w-full text-center bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow">Manage Customers</a>
+                    <a href="#" class="block w-full text-center bg-purple-500 hover:bg-purple-600 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow">View Payments</a>
                 </div>
             </div>
+        </div>
 
-            <!-- Disbursed Loans Section -->
-            <div id="disbursed-loan-section" class="mb-6">
-                <h2 class="text-xl font-semibold mb-2">My Disbursed Loans</h2>
-                <div id="disbursed-loan-list" class="space-y-2">
-                    <p class="text-gray-500 text-sm">Loading loans...</p>
+        <!-- Customer Dashboard (Initially Hidden) -->
+        <div id="customer-view" class="hidden">
+            <h1 class="text-4xl font-bold text-center text-gray-800">Customer Dashboard</h1>
+            <p class="text-center text-gray-600 mt-2">Welcome, Customer!</p>
+            <div class="mt-6">
+                <button onclick="handleLogout()" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">Logout</button>
+            </div>
+            <!-- More customer features will be added here -->
+            <div id="customer-dashboard-content" class="mt-8">
+                <div class="space-y-4">
+                    <a href="#" class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow">Apply for a Loan</a>
+                    <a href="#" class="block w-full text-center bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow">View My Loans</a>
+                    <a href="#" class="block w-full text-center bg-purple-500 hover:bg-purple-600 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow">My Profile</a>
                 </div>
             </div>
-
-            <!-- Profile Section -->
-            <div id="profile-section" class="mb-6">
-                <h2 class="text-xl font-semibold mb-2">My Profile</h2>
-                <form id="profile-form" class="space-y-4">
-                    <div>
-                        <label for="profile-national-id" class="block text-sm font-medium text-gray-700">National ID</label>
-                        <input type="text" id="profile-national-id" name="national_id" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="profile-email" class="block text-sm font-medium text-gray-700">Email</label>
-                        <input type="email" id="profile-email" name="email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="profile-address" class="block text-sm font-medium text-gray-700">Address</label>
-                        <input type="text" id="profile-address" name="address" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="profile-digital-address" class="block text-sm font-medium text-gray-700">Digital Address</label>
-                        <input type="text" id="profile-digital-address" name="digital_address" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-                        Update Profile
-                    </button>
-                    <p id="profile-message" class="text-center text-sm font-medium"></p>
-                </form>
-            </div>
-            
-            <!-- Apply for Loan Section -->
-            <div id="apply-loan-section" class="mb-6">
-                <h2 class="text-xl font-semibold mb-2" id="loan-form-title">Apply for a New Loan</h2>
-                <form id="loan-application-form" class="space-y-4">
-                    <div>
-                        <label for="loan-types" class="block text-sm font-medium text-gray-700">Loan Type</label>
-                        <select id="loan-types" name="loan_type" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                            <!-- Options will be populated by JavaScript -->
-                        </select>
-                    </div>
-                    <div>
-                        <label for="loan-amount" class="block text-sm font-medium text-gray-700">Amount (GHS)</label>
-                        <input type="number" id="loan-amount" name="amount" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                    </div>
-                    <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out" id="loan-form-submit-btn">
-                        Submit Application
-                    </button>
-                    <p id="loan-application-message" class="text-center text-sm font-medium"></p>
-                </form>
-            </div>
-
-            <button id="logout-btn" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">
-                Logout</button>
         </div>
     </div>
 
-    <!-- Loan Details Modal (initially hidden) -->
-    <div id="loan-details-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">Loan Details</h2>
-            <div class="space-y-3 text-gray-700">
-                <p><strong>Loan Type:</strong> <span id="detail-loan-type"></span></p>
-                <p><strong>Loan Amount:</strong> <span id="detail-amount"></span></p>
-                <p><strong>Interest Rate:</strong> <span id="detail-interest-rate"></span>%</p>
-                <p><strong>Term:</strong> <span id="detail-term"></span> months</p>
-                <p><strong>Balance:</strong> <span id="detail-balance" class="font-bold"></span></p>
-                <p><strong>Disbursed:</strong> <span id="detail-disbursed" class="font-bold"></span></p>
-                <p><strong>Disbursement Date:</strong> <span id="detail-disbursement-date"></span></p>
-            </div>
-
-            <div id="payment-history-section" class="mt-8">
-                <h3 class="text-xl font-bold mb-4">Payment History</h3>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Paid</th>
-                            </tr>
-                        </thead>
-                        <tbody id="payment-history-body" class="bg-white divide-y divide-gray-200">
-                            <!-- Payment rows will be dynamically inserted here -->
-                        </tbody>
-                    </table>
-                    <p id="no-payments-message" class="text-gray-500 text-sm mt-4 hidden">No payments made yet.</p>
-                </div>
-            </div>
-        </div>
+    <!-- The Modal -->
+    <div id="message-modal" class="modal">
+      <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <p id="modal-message" class="text-lg font-semibold text-gray-800"></p>
+        <button id="modal-ok-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">OK</button>
+      </div>
     </div>
 
     <script>
-        const API_BASE_URL = 'http://127.0.0.1:8000/api';
+        // API Base URL
+        const API_BASE_URL = window.location.origin;
 
-        const authContainer = document.getElementById('auth-container');
-        const dashboardContainer = document.getElementById('dashboard-container');
-        const showLoginBtn = document.getElementById('show-login-btn');
-        const showRegisterBtn = document.getElementById('show-register-btn');
+        // Get DOM elements
+        const authView = document.getElementById('auth-view');
+        const adminView = document.getElementById('admin-view');
+        const customerView = document.getElementById('customer-view');
+        const loginTab = document.getElementById('login-tab');
+        const registerTab = document.getElementById('register-tab');
         const loginForm = document.getElementById('login-form');
         const registerForm = document.getElementById('register-form');
-        const loginMessage = document.getElementById('login-message');
-        const registerMessage = document.getElementById('register-message');
-        const logoutBtn = document.getElementById('logout-btn');
-        const profileForm = document.getElementById('profile-form');
-        const profileNationalId = document.getElementById('profile-national-id');
-        const profileEmail = document.getElementById('profile-email');
-        const profileAddress = document.getElementById('profile-address');
-        const profileDigitalAddress = document.getElementById('profile-digital-address');
-        const profileMessage = document.getElementById('profile-message');
-        const loanList = document.getElementById('loan-list');
-        const disbursedLoanList = document.getElementById('disbursed-loan-list');
-        const loanApplicationForm = document.getElementById('loan-application-form');
-        const loanTypesSelect = document.getElementById('loan-types');
-        const loanApplicationMessage = document.getElementById('loan-application-message');
+        const registerBtn = document.getElementById('register-btn');
+        const loginError = document.getElementById('login-error');
+        const registerError = document.getElementById('register-error');
+        const messageModal = document.getElementById('message-modal');
+        const modalMessage = document.getElementById('modal-message');
+        const modalOkBtn = document.getElementById('modal-ok-btn');
+        const modalCloseBtn = document.querySelector('.close-button');
 
-        const loanFormTitle = document.getElementById('loan-form-title');
-        const loanFormSubmitBtn = document.getElementById('loan-form-submit-btn');
-        const loanAmountInput = document.getElementById('loan-amount');
-        
-        const loanDetailsModal = document.getElementById('loan-details-modal');
-        const closeModalBtn = document.getElementById('close-modal-btn');
-        const detailLoanType = document.getElementById('detail-loan-type');
-        const detailAmount = document.getElementById('detail-amount');
-        const detailInterestRate = document.getElementById('detail-interest-rate');
-        const detailTerm = document.getElementById('detail-term');
-        const detailBalance = document.getElementById('detail-balance');
-        const detailDisbursed = document.getElementById('detail-disbursed');
-        const detailDisbursementDate = document.getElementById('detail-disbursement-date');
-        const paymentHistoryBody = document.getElementById('payment-history-body');
-        const noPaymentsMessage = document.getElementById('no-payments-message');
+        // Function to show the custom modal
+        function showModal(message) {
+            modalMessage.textContent = message;
+            messageModal.style.display = 'flex';
+        }
 
-        let userLoans = []; // Store loan data here for details view
+        // Function to hide the custom modal
+        function hideModal() {
+            messageModal.style.display = 'none';
+        }
 
-        // Function to fetch all loan types and populate the select dropdown
-        async function fetchLoanTypes() {
+        // Event listeners for the modal
+        modalOkBtn.addEventListener('click', hideModal);
+        modalCloseBtn.addEventListener('click', hideModal);
+
+        // Function to toggle between login and register forms
+        function showLogin() {
+            loginTab.classList.add('bg-blue-600', 'text-white');
+            loginTab.classList.remove('text-gray-600');
+            registerTab.classList.remove('bg-blue-600', 'text-white');
+            registerTab.classList.add('text-gray-600');
+            loginForm.classList.remove('hidden');
+            registerForm.classList.add('hidden');
+            loginError.textContent = '';
+            registerError.textContent = '';
+            // Hide dashboard views
+            adminView.classList.add('hidden');
+            customerView.classList.add('hidden');
+            authView.classList.remove('hidden');
+        }
+
+        function showRegister() {
+            registerTab.classList.add('bg-blue-600', 'text-white');
+            registerTab.classList.remove('text-gray-600');
+            loginTab.classList.remove('bg-blue-600', 'text-white');
+            loginTab.classList.add('text-gray-600');
+            registerForm.classList.remove('hidden');
+            loginForm.classList.add('hidden');
+            loginError.textContent = '';
+            registerError.textContent = '';
+            // Hide dashboard views
+            adminView.classList.add('hidden');
+            customerView.classList.add('hidden');
+            authView.classList.remove('hidden');
+        }
+
+        // Set up event listeners for tab buttons
+        loginTab.addEventListener('click', showLogin);
+        registerTab.addEventListener('click', showRegister);
+
+        // Function to handle login
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const username = loginForm.elements['username'].value;
+            const password = loginForm.elements['password'].value;
+
             try {
-                const response = await fetch(`${API_BASE_URL}/loan-types/`);
+                const response = await fetch(`${API_BASE_URL}/api/login/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }),
+                });
+
                 const data = await response.json();
-                
-                loanTypesSelect.innerHTML = ''; // Clear existing options
-                
-                if (data.length > 0) {
-                    data.forEach(loanType => {
-                        const option = document.createElement('option');
-                        option.value = loanType.id;
-                        option.textContent = `${loanType.name} (Term: ${loanType.term_months} months, Rate: ${loanType.interest_rate}%)`;
-                        loanTypesSelect.appendChild(option);
-                    });
+
+                if (response.ok) {
+                    // Store the token and user data in local storage
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data));
+                    
+                    // Redirect to the appropriate dashboard
+                    updateView();
                 } else {
-                    const option = document.createElement('option');
-                    option.textContent = 'No loan types available';
-                    loanTypesSelect.appendChild(option);
+                    loginError.textContent = data.error || 'Login failed. Please try again.';
                 }
             } catch (error) {
-                console.error('Failed to fetch loan types:', error);
-                const option = document.createElement('option');
-                option.textContent = 'Failed to load loan types';
-                loanTypesSelect.appendChild(option);
+                console.error('Error during login:', error);
+                loginError.textContent = 'An error occurred. Please try again later.';
             }
         }
 
-        // Function to clear form fields
-        function clearForms() {
-            loginForm.reset();
-            registerForm.reset();
-        }
+        // Function to handle registration
+        async function handleRegister(event) {
+            event.preventDefault();
 
-        // Function to toggle between login and registration forms
-        function toggleForms(showLogin) {
-            clearForms();
-            if (showLogin) {
-                loginForm.classList.remove('hidden');
-                registerForm.classList.add('hidden');
-                showLoginBtn.classList.add('bg-blue-600', 'text-white');
-                showLoginBtn.classList.remove('bg-gray-200', 'text-blue-600');
-                showRegisterBtn.classList.add('bg-gray-200', 'text-blue-600');
-                showRegisterBtn.classList.remove('bg-blue-600', 'text-white');
-            } else {
-                loginForm.classList.add('hidden');
-                registerForm.classList.remove('hidden');
-                showLoginBtn.classList.remove('bg-blue-600', 'text-white');
-                showLoginBtn.classList.add('bg-gray-200', 'text-blue-600');
-                showRegisterBtn.classList.remove('bg-gray-200', 'text-blue-600');
-                showRegisterBtn.classList.add('bg-blue-600', 'text-white');
-            }
-            loginMessage.textContent = '';
-            registerMessage.textContent = '';
-        }
+            // Show loading spinner
+            registerBtn.innerHTML = '<div class="spinner"></div>';
+            registerBtn.disabled = true;
 
-        // Function to fetch and display user data and loan applications
-        async function fetchUserData() {
-            const token = localStorage.getItem('userToken');
-            if (!token) return;
-            
-            // Fetch profile data
             try {
-                const profileResponse = await fetch(`${API_BASE_URL}/profile/`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Token ${token}` }
-                });
-                if (profileResponse.ok) {
-                    const profileData = await profileResponse.json();
-                    profileNationalId.value = profileData.national_id || '';
-                    profileEmail.value = profileData.email || '';
-                    profileAddress.value = profileData.address || '';
-                    profileDigitalAddress.value = profileData.digital_address || '';
-                }
-            } catch (error) {
-                console.error('Failed to fetch profile:', error);
-            }
+                // Use FormData to handle both text fields and file uploads
+                const formData = new FormData(registerForm);
 
-            // Fetch loan applications
-            try {
-                const loanAppResponse = await fetch(`${API_BASE_URL}/loan-applications/`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Token ${token}` }
+                // These are added to the form directly via hidden fields on the backend
+                // but we add them here just in case they are needed for the backend
+                formData.append('is_customer', true);
+                formData.append('is_admin', false);
+                formData.append('is_staff', false);
+
+                const response = await fetch(`${API_BASE_URL}/api/register/`, {
+                    method: 'POST',
+                    // Note: No 'Content-Type' header is needed for FormData, the browser sets it automatically
+                    body: formData,
                 });
-                if (loanAppResponse.ok) {
-                    const loanApps = await loanAppResponse.json(); 
-                    loanList.innerHTML = '';
-                    if (loanApps.length > 0) {
-                        loanApps.forEach(loan => {
-                            const loanItem = document.createElement('div');
-                            loanItem.className = 'p-4 border border-gray-200 rounded-md shadow-sm flex justify-between items-center';
-                            
-                            const loanInfo = document.createElement('div');
-                            loanInfo.innerHTML = `
-                                <p class="text-sm font-semibold text-gray-800">Amount: GHS ${loan.amount}</p>
-                                <p class="text-xs text-gray-500">Status: <span class="font-medium text-blue-600">${loan.status}</span></p>
-                            `;
-                            loanItem.appendChild(loanInfo);
-                            
-                            loanList.appendChild(loanItem);
-                        });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showModal('Registration successful! Please login to continue. Your account needs admin approval before you can apply for a loan.');
+                    showLogin();
+                } else {
+                    // Display the specific error message from the server
+                    if (data && typeof data === 'object') {
+                        let errorMsg = '';
+                        for (const key in data) {
+                            errorMsg += `${key}: ${data[key].join(', ')}\n`;
+                        }
+                        registerError.textContent = errorMsg.trim();
                     } else {
-                        loanList.innerHTML = '<p class="text-gray-500 text-sm">No applications found.</p>';
+                        registerError.textContent = data.error || 'Registration failed. Please try again.';
                     }
                 }
             } catch (error) {
-                console.error('Failed to fetch loan applications:', error);
-                loanList.innerHTML = '<p class="text-gray-500 text-sm">Failed to load applications.</p>';
+                console.error('Error during registration:', error);
+                registerError.textContent = 'An error occurred. Please try again later.';
+            } finally {
+                // Hide loading spinner and enable the button
+                registerBtn.innerHTML = 'Register';
+                registerBtn.disabled = false;
             }
-            
-            // Fetch disbursed loans
-            try {
-                const disbursedLoanResponse = await fetch(`${API_BASE_URL}/loans/`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Token ${token}` }
-                });
-                if (disbursedLoanResponse.ok) {
-                    const disbursedLoans = await disbursedLoanResponse.json();
-                    disbursedLoanList.innerHTML = '';
-                    if (disbursedLoans.length > 0) {
-                        disbursedLoans.forEach(loan => {
-                            const loanItem = document.createElement('div');
-                            loanItem.className = 'p-4 border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 cursor-pointer transition duration-150 ease-in-out';
-                            loanItem.addEventListener('click', () => showLoanDetails(loan));
-                            
-                            loanItem.innerHTML = `
-                                <p class="text-sm font-semibold text-gray-800">Loan Type: ${loan.loan_type}</p>
-                                <p class="text-xs text-gray-500">Balance: GHS ${loan.balance.toFixed(2)}</p>
-                                <p class="text-xs text-gray-500">Disbursed: ${loan.disbursement_date ? 'Yes' : 'No'}</p>
-                            `;
-                            disbursedLoanList.appendChild(loanItem);
-                        });
-                    } else {
-                        disbursedLoanList.innerHTML = '<p class="text-gray-500 text-sm">No disbursed loans found.</p>';
-                    }
+        }
+
+        // Function to handle logout
+        function handleLogout() {
+            localStorage.clear();
+            updateView();
+        }
+
+        // Function to update the view based on authentication state
+        function updateView() {
+            const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user'));
+            const isAdmin = user && user.is_admin;
+            const isCustomer = user && user.is_customer;
+
+            // Hide all views initially
+            authView.classList.add('hidden');
+            adminView.classList.add('hidden');
+            customerView.classList.add('hidden');
+
+            if (token && user) {
+                if (isAdmin) {
+                    adminView.classList.remove('hidden');
+                } else if (isCustomer) {
+                    customerView.classList.remove('hidden');
                 }
-            } catch (error) {
-                console.error('Failed to fetch disbursed loans:', error);
-                disbursedLoanList.innerHTML = '<p class="text-gray-500 text-sm">Failed to load disbursed loans.</p>';
-            }
-        }
-
-        // Event listener for form toggle buttons
-        showLoginBtn.addEventListener('click', () => toggleForms(true));
-        showRegisterBtn.addEventListener('click', () => toggleForms(false));
-
-        // Function to show the dashboard and hide auth forms
-        function showDashboard(username) {
-            authContainer.classList.add('hidden');
-            dashboardContainer.classList.remove('hidden');
-            document.getElementById('welcome-message').textContent = `Welcome, ${username}!`;
-            fetchLoanTypes();
-            fetchUserData();
-        }
-
-        // Function to show auth forms and hide the dashboard
-        function showAuthContainer() {
-            authContainer.classList.remove('hidden');
-            dashboardContainer.classList.add('hidden');
-            document.getElementById('welcome-message').textContent = '';
-            localStorage.removeItem('userToken');
-            localStorage.removeItem('username');
-            clearForms();
-        }
-
-        // Function to handle API responses
-        async function handleResponse(response, messageElement) {
-            const data = await response.json();
-            if (response.ok) {
-                messageElement.textContent = 'Success!';
-                messageElement.classList.remove('text-red-500');
-                messageElement.classList.add('text-green-500');
-                return data;
             } else {
-                messageElement.textContent = JSON.stringify(data.error || data);
-                messageElement.classList.remove('text-green-500');
-                messageElement.classList.add('text-red-500');
-                return null;
+                authView.classList.remove('hidden');
+                showLogin(); // Show login form by default
             }
         }
 
-        // Login form submission handler
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('login-username').value;
-            const password = document.getElementById('login-password').value;
+        // Attach form submission handlers
+        loginForm.addEventListener('submit', handleLogin);
+        registerForm.addEventListener('submit', handleRegister);
 
-            const response = await fetch(`${API_BASE_URL}/login/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-
-            const data = await handleResponse(response, loginMessage);
-            if (data && data.token) {
-                localStorage.setItem('userToken', data.token);
-                localStorage.setItem('username', username);
-                showDashboard(username);
-            }
-        });
-
-        // Registration form submission handler
-        registerForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('register-username').value;
-            const phoneNumber = document.getElementById('register-phone').value;
-            const name = document.getElementById('register-name').value;
-            const password = document.getElementById('register-password').value;
-
-            const response = await fetch(`${API_BASE_URL}/users/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, phone_number: phoneNumber, name, password })
-            });
-
-            const data = await handleResponse(response, registerMessage);
-            if (data) {
-                toggleForms(true);
-            }
-        });
-
-        // Logout button handler
-        logoutBtn.addEventListener('click', showAuthContainer);
-
-        // Check for existing token on page load
-        window.onload = () => {
-            const token = localStorage.getItem('userToken');
-            const username = localStorage.getItem('username');
-            if (token && username) {
-                showDashboard(username);
-            } else {
-                showAuthContainer();
-            }
-        };
-
-        // Profile form submission handler
-        profileForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const token = localStorage.getItem('userToken');
-            if (!token) return;
-
-            const nationalId = profileNationalId.value;
-            const email = profileEmail.value;
-            const address = profileAddress.value;
-            const digitalAddress = profileDigitalAddress.value;
-
-            const response = await fetch(`${API_BASE_URL}/profile/`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Token ${token}`
-                },
-                body: JSON.stringify({
-                    national_id: nationalId,
-                    email: email,
-                    address: address,
-                    digital_address: digitalAddress,
-                })
-            });
-
-            const data = await handleResponse(response, profileMessage);
-            if (data) {
-                profileMessage.textContent = 'Profile updated successfully!';
-                profileMessage.classList.remove('text-red-500');
-                profileMessage.classList.add('text-green-500');
-            }
-        });
-
-        // Loan application form submission handler
-        loanApplicationForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const token = localStorage.getItem('userToken');
-            if (!token) return;
-
-            const loanTypeId = loanTypesSelect.value;
-            const amount = loanAmountInput.value;
-
-            const response = await fetch(`${API_BASE_URL}/loan-applications/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Token ${token}`
-                },
-                body: JSON.stringify({
-                    loan_type: loanTypeId,
-                    amount: amount,
-                })
-            });
-
-            const data = await handleResponse(response, loanApplicationMessage);
-            if (data) {
-                fetchUserData();
-                loanApplicationForm.reset();
-            }
-        });
-
-        // Function to show loan details in a modal
-        function showLoanDetails(loan) {
-            detailLoanType.textContent = loan.loan_type;
-            detailAmount.textContent = `GHS ${loan.amount}`;
-            detailInterestRate.textContent = loan.interest_rate;
-            detailTerm.textContent = loan.term_months;
-            detailBalance.textContent = `GHS ${loan.balance.toFixed(2)}`;
-            detailDisbursed.textContent = loan.disbursed ? 'Yes' : 'No';
-            detailDisbursementDate.textContent = loan.disbursement_date ? new Date(loan.disbursement_date).toLocaleDateString() : 'N/A';
-            
-            // Populate payment history
-            paymentHistoryBody.innerHTML = ''; // Clear previous history
-            if (loan.payments.length > 0) {
-                noPaymentsMessage.classList.add('hidden');
-                loan.payments.forEach(payment => {
-                    const row = document.createElement('tr');
-                    row.className = 'text-sm text-gray-700 hover:bg-gray-100';
-                    row.innerHTML = `
-                        <td class="px-4 py-2">${new Date(payment.payment_date).toLocaleDateString()}</td>
-                        <td class="px-4 py-2">GHS ${payment.amount_paid.toFixed(2)}</td>
-                    `;
-                    paymentHistoryBody.appendChild(row);
-                });
-            } else {
-                noPaymentsMessage.classList.remove('hidden');
-            }
-
-            loanDetailsModal.classList.remove('hidden');
-        }
-
-        // Close modal button event listener
-        closeModalBtn.addEventListener('click', () => {
-            loanDetailsModal.classList.add('hidden');
-        });
-
+        // Initial view update on page load
+        document.addEventListener('DOMContentLoaded', updateView);
     </script>
 </body>
 </html>

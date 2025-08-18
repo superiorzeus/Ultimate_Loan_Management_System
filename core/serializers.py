@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, CustomerProfile, LoanApplication, Loan, Payment, LoanType
+from .models import User, CustomerProfile, LoanApplication, Loan, Payment, LoanType, PaymentSchedule
 from django.db import transaction
 
 # A serializer for the LoanType model.
@@ -10,28 +10,44 @@ class LoanTypeSerializer(serializers.ModelSerializer):
 
 # A serializer for the Payment model.
 class PaymentSerializer(serializers.ModelSerializer):
+    # The recorded_by field is read-only because it's set by the backend.
+    recorded_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    
     class Meta:
         model = Payment
-        fields = ['amount_paid', 'payment_date']
-        read_only_fields = ['payment_date']
+        fields = ['id', 'amount_paid', 'payment_date', 'recorded_by']
+        read_only_fields = ['payment_date', 'recorded_by']
 
-
-# A serializer for the Loan model. It includes a nested Payments field.
-class LoanSerializer(serializers.ModelSerializer):
+# A new serializer for the PaymentSchedule model. This is used to display the full payment plan.
+class PaymentScheduleSerializer(serializers.ModelSerializer):
+    # Use a nested serializer to show the actual payments made against a scheduled entry.
     payments = PaymentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PaymentSchedule
+        fields = ['id', 'due_date', 'due_amount', 'is_paid', 'payments']
+        read_only_fields = ['is_paid']
+
+# A serializer for the Loan model. It now includes the PaymentSchedule.
+class LoanSerializer(serializers.ModelSerializer):
+    # This will display the full payment schedule for the loan.
+    payment_schedule = PaymentScheduleSerializer(many=True, read_only=True)
     loan_type = serializers.CharField(source='application.loan_type.name')
     term_months = serializers.IntegerField(source='application.loan_type.term_months')
     
     class Meta:
         model = Loan
         fields = [
-            'amount', 'interest_rate', 'term_months', 'balance', 
-            'disbursed', 'disbursement_date', 'start_date', 'end_date', 'payments', 'loan_type'
+            'id', 'amount', 'interest_rate', 'term_months', 'balance', 
+            'disbursed', 'disbursement_date', 'start_date', 'end_date',
+            'loan_type', 'payment_schedule' # Renamed from 'payments' to 'payment_schedule'
         ]
 
 
 # A serializer for the LoanApplication model.
 class LoanApplicationSerializer(serializers.ModelSerializer):
+    # This serializer now uses a PrimaryKeyRelatedField for the user's customer profile.
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
     loan_type = serializers.PrimaryKeyRelatedField(queryset=LoanType.objects.all())
     loan = LoanSerializer(read_only=True)
 
@@ -45,6 +61,7 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
+        # Added 'is_admin' to fields for the login view check.
         fields = ['username', 'phone_number', 'name', 'is_customer', 'is_admin', 'is_staff', 'password']
         extra_kwargs = {'password': {'write_only': True}}
     
@@ -90,4 +107,3 @@ class CustomerDetailSerializer(serializers.ModelSerializer):
             customer_profile.save()
         
         return instance
-

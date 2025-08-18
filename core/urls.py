@@ -2,7 +2,9 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     UserViewSet, CustomerProfileViewSet, LoanTypeViewSet,
-    LoanApplicationViewSet, LoanViewSet, PaymentViewSet, index
+    LoanApplicationViewSet, LoanViewSet, PaymentViewSet,
+    LoginView, # We need to import the new LoginView here
+    index
 )
 
 
@@ -17,6 +19,10 @@ router.register(r'payments', PaymentViewSet, basename='payments')
 
 # The API URLs are now determined automatically by the router.
 urlpatterns = [
+    # The login URL is not part of a ViewSet, so we add it manually.
+    # We'll place it under the 'api/' prefix to keep things organized.
+    path('api/login/', LoginView.as_view(), name='login'),
+
     # The API endpoints are now nested under the 'api/' prefix
     path('api/', include(router.urls)),
     # This is the new URL pattern that serves the index.html template

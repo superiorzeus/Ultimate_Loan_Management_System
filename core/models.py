@@ -1,8 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
-
-# Create your models here.
+import uuid
 
 # A custom user manager to handle user creation with username and phone number
 class CustomUserManager(BaseUserManager):
@@ -52,7 +51,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 # Customer Profile Model
 # This model holds the additional details for a customer user
 class CustomerProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name='customer_profile')
     national_id = models.CharField(max_length=100)
     email = models.EmailField(blank=True, null=True)
     address = models.TextField()
@@ -85,6 +84,7 @@ class LoanApplication(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
+        ('disbursed', 'Disbursed'),
         ('rejected', 'Rejected'),
     ]
     
@@ -95,6 +95,9 @@ class LoanApplication(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
+    date_approved = models.DateTimeField(null=True, blank=True)
+    date_disbursed = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_applications')
 
     def __str__(self):
         return f"Loan application by {self.user.username} for {self.loan_type.name}"
@@ -116,12 +119,31 @@ class Loan(models.Model):
     def __str__(self):
         return f"Loan for {self.application.user.username} - GHS{self.amount}"
 
+# A new model to store the payment schedule for a loan.
+class PaymentSchedule(models.Model):
+    loan_application = models.ForeignKey(LoanApplication, on_delete=models.CASCADE, related_name='payment_schedule')
+    due_date = models.DateField()
+    due_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    principal_due = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    interest_due = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    is_paid = models.BooleanField(default=False)
+    date_paid = models.DateField(null=True, blank=True)
+    is_overdue = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Payment due on {self.due_date} for loan application {self.loan_application.id}"
+
+
 # Payment Model
 # This model stores all the payments made towards a specific loan.
 class Payment(models.Model):
-    loan = models.ForeignKey(Loan, on_delete=models.CASCADE)
+    payment_schedule = models.ForeignKey(PaymentSchedule, on_delete=models.CASCADE, related_name='payments')
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateTimeField(auto_now_add=True)
+    # New field to record which admin processed the payment
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_payments')
+    # Using UUIDField for a unique, hard-to-guess transaction ID.
+    transaction_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     def __str__(self):
-        return f"Payment of GHS{self.amount_paid} for loan {self.loan.id}"
+        return f"Payment of GHS{self.amount_paid} for loan {self.payment_schedule.loan_application.id}"
