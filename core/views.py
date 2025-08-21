@@ -12,7 +12,7 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from datetime import timedelta
 
 # Django Rest Framework imports
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions, mixins
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view
@@ -30,7 +30,7 @@ from .serializers import (
     UserSerializer, CustomerProfileSerializer, CustomerDetailSerializer,
     LoanApplicationSerializer, LoanSerializer, LoanTypeSerializer,
     PaymentSerializer, PaymentScheduleSerializer, LoanApplicationApproveSerializer, UserRegisterSerializer,
-    CustomerSerializer
+    CustomerSerializer, SummarySerializer
 )
 
 # A new view to render the index.html template.
@@ -527,3 +527,25 @@ def customer_detail_view(request, username):
     }
 
     return render(request, 'customer_detail.html', context)
+
+class SummaryViewSet(viewsets.GenericViewSet, mixins.ListModelMixin):
+    """
+    API endpoint that provides a summary of key metrics for the dashboard.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = SummarySerializer
+
+    def list(self, request, *args, **kwargs):
+        total_loans = Loan.objects.count()
+        # Corrected line: Filter for loans with a balance of 0
+        paid_loans = Loan.objects.filter(balance=0).count()
+        pending_applications = LoanApplication.objects.filter(status='pending').count()
+
+        summary_data = {
+            "total_loans": total_loans,
+            "paid_loans": paid_loans,
+            "pending_applications": pending_applications,
+        }
+        
+        serializer = self.get_serializer(summary_data)
+        return Response(serializer.data)

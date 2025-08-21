@@ -173,3 +173,9 @@ class CustomerDetailSerializer(serializers.ModelSerializer):
             customer_profile.save()
         
         return instance
+    
+
+class SummarySerializer(serializers.Serializer):
+    total_loans = serializers.IntegerField()
+    paid_loans = serializers.IntegerField()
+    pending_applications = serializers.IntegerField()

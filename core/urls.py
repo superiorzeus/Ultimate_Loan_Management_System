@@ -5,7 +5,7 @@ from .views import (
     UserViewSet, CustomerProfileViewSet, LoanTypeViewSet,
     LoanApplicationViewSet, LoanViewSet, PaymentViewSet, 
     UserRegisterView, CustomerViewSet, PaymentScheduleViewSet, register_view,
-    index, login_view, dashboard_view, logout_and_redirect, AdminCreateCustomerView, add_customer_view, CustomerListView, customer_detail_view
+    index, login_view, dashboard_view, logout_and_redirect, AdminCreateCustomerView, add_customer_view, CustomerListView, customer_detail_view, SummaryViewSet
 )
 
 
@@ -19,6 +19,9 @@ router.register(r'loans', LoanViewSet)
 router.register(r'payments', PaymentViewSet, basename='payments')
 router.register(r'customers', CustomerViewSet, basename='customers')
 router.register(r'payment-schedules', PaymentScheduleViewSet)
+
+# Add this new line for the summary endpoint
+router.register(r'summary', SummaryViewSet, basename='summary')
 
 
 urlpatterns = [
