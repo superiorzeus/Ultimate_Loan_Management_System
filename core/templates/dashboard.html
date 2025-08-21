@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -49,13 +47,11 @@
 </head>
 <body class="p-6 md:p-12">
 
-    <!-- Header Section -->
     <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div class="mb-4 md:mb-0">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Admin Dashboard</h1>
             <p class="text-lg text-gray-600">Welcome, {{ user.username }}!</p>
         </div>
-        <!-- Logout button as a form to use POST method -->
         <form action="{% url 'logout' %}" method="post">
             {% csrf_token %}
             <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
@@ -64,7 +60,6 @@
         </form>
     </header>
 
-    <!-- Navigation Tabs for different management views -->
     <nav class="mb-8 border-b border-gray-200">
         <ul class="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500">
             <li class="mr-2">
@@ -85,11 +80,8 @@
         </ul>
     </nav>
 
-    <!-- Main Content Container with different sections for each view -->
     <main id="main-content" class="space-y-8">
-        <!-- Dashboard Section -->
         <div id="dashboard-view" class="view-section active">
-            <!-- Summary Cards Section -->
             <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <div id="total-loans-card" class="bg-white rounded-xl shadow-lg p-6 flex flex-col items-start transition-transform duration-300 hover:scale-[1.02]">
                     <h3 class="text-gray-500 text-sm font-medium uppercase tracking-wide">Total Loans</h3>
@@ -116,9 +108,7 @@
                 </div>
             </section>
             
-            <!-- Recent Activity Section -->
             <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- Recent Payments Table -->
                 <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                     <div class="p-6">
                         <h2 class="text-2xl font-bold text-gray-800">Recent Payments</h2>
@@ -140,7 +130,6 @@
                     </div>
                 </div>
                 
-                <!-- Recent Applications Table -->
                 <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                     <div class="p-6">
                         <h2 class="text-2xl font-bold text-gray-800">Recent Loan Applications</h2>
@@ -165,10 +154,8 @@
             </section>
         </div>
 
-        <!-- Manage Customers Section -->
         <div id="customers-view" class="view-section hidden">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Customers</h2>
-            <!-- New 'Add New Customer' button for staff members -->
             {% if user.is_staff %}
             <a href="{% url 'add-customer' %}" class="btn-primary inline-block mb-4">
                 Add New Customer
@@ -193,7 +180,6 @@
             </div>
         </div>
         
-        <!-- Manage Loans Section -->
         <div id="loans-view" class="view-section hidden">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Loans</h2>
             <div class="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -216,7 +202,6 @@
             </div>
         </div>
 
-        <!-- Manage Applications Section -->
         <div id="applications-view" class="view-section hidden">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Applications</h2>
             <a href="{% url 'add-loan-application' %}" class="btn-primary inline-block mb-4">
@@ -243,7 +228,6 @@
             </div>
         </div>
 
-        <!-- Manage Payments Section -->
         <div id="payments-view" class="view-section hidden">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Payments</h2>
             <div class="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -267,7 +251,6 @@
         </div>
     </main>
 
-    <!-- Generic Modal for messages -->
     <div id="message-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" aria-hidden="true"></div>
@@ -308,7 +291,7 @@
         const formatCurrency = (amount) => {
             return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
         };
-
+        
         const fetchDashboardData = async () => {
             try {
                 // Fetch summary statistics
@@ -344,6 +327,7 @@
                     const applicationsHtml = applications.slice(0, 5).map(app => `
                         <tr class="transition-colors duration-200 hover:bg-gray-50">
                             <td>${app.id}</td>
+                            <td>${app.customer_name}</td>
                             <td>${formatCurrency(app.amount)}</td>
                             <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
                             <td>${new Date(app.date_created).toLocaleDateString()}</td>
@@ -351,12 +335,12 @@
                     `).join('');
                     dashboardApplicationsTableBody.innerHTML = applicationsHtml;
                 } else {
-                    dashboardApplicationsTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No recent applications found.</td></tr>';
+                    dashboardApplicationsTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No recent applications found.</td></tr>';
                 }
             } catch (error) {
                 console.error("Failed to fetch dashboard data:", error);
                 document.getElementById('dashboard-payments-table-body').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
-                document.getElementById('dashboard-applications-table-body').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
+                document.getElementById('dashboard-applications-table-body').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
             }
         };
 
@@ -410,7 +394,12 @@
                         <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
                         <td>${new Date(app.date_created).toLocaleDateString()}</td>
                         <td>
-                            <a href="#" onclick="showModal('View Application', 'Viewing application #${app.id}')" class="text-blue-600 hover:underline">View</a>
+                            ${app.status === 'pending' ?
+                                `<button onclick="approveApplication(${app.id})" class="text-green-600 hover:underline mr-2">Approve</button>
+                                 <button onclick="rejectApplication(${app.id})" class="text-red-600 hover:underline">Reject</button>`
+                                :
+                                `<span class="text-gray-500">N/A</span>`
+                            }
                         </td>
                     </tr>
                 `).join('');
@@ -418,6 +407,58 @@
             } catch (error) {
                 console.error("Failed to fetch applications:", error);
                 applicationsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
+            }
+        };
+
+        // New function to handle loan application approval
+        const approveApplication = async (applicationId) => {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const url = `${API_BASE_URL}/api/loan-applications/${applicationId}/approve/`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'Authorization': `Token {{ request.user.auth_token.key }}`
+                    }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showModal('Success', result.status);
+                    fetchApplications(); // Reload applications table
+                } else {
+                    showModal('Error', result.detail || 'An unexpected error occurred.');
+                }
+            } catch (error) {
+                console.error('Error approving application:', error);
+                showModal('Error', 'Failed to approve application. Please try again.');
+            }
+        };
+
+        // New function to handle loan application rejection
+        const rejectApplication = async (applicationId) => {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const url = `${API_BASE_URL}/api/loan-applications/${applicationId}/reject/`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'Authorization': `Token {{ request.user.auth_token.key }}`
+                    }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showModal('Success', result.status);
+                    fetchApplications(); // Reload applications table
+                } else {
+                    showModal('Error', result.detail || 'An unexpected error occurred.');
+                }
+            } catch (error) {
+                console.error('Error rejecting application:', error);
+                showModal('Error', 'Failed to reject application. Please try again.');
             }
         };
         
@@ -437,7 +478,7 @@
                         <td>${loan.id}</td>
                         <td>${loan.customer_name}</td>
                         <td>${formatCurrency(loan.loan_application.amount)}</td>
-                        <td class="${loan.is_paid ? 'text-green-600' : 'text-red-600'} capitalize">${loan.is_paid ? 'Paid' : 'Unpaid'}</td>
+                        <td class="${loan.balance === 0 ? 'text-green-600' : 'text-red-600'} capitalize">${loan.balance === 0 ? 'Paid' : 'Unpaid'}</td>
                         <td>
                             <a href="#" onclick="showModal('View Loan', 'Viewing loan #${loan.id}')" class="text-blue-600 hover:underline">View</a>
                         </td>

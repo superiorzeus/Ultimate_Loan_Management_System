@@ -221,8 +221,55 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
         Custom create method that sets the user on the loan application.
         """
         # The user is automatically set to the currently authenticated user
-        serializer.validated_data['user'] = self.request.user
+        if not self.request.user.is_staff:
+            serializer.validated_data['user'] = self.request.user
         serializer.save()
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_application(self, request, pk=None):
+        """
+        Action to approve a loan application.
+        Only accessible by staff users.
+        """
+        if not request.user.is_staff:
+            return Response({"detail": "You do not have permission to perform this action."},
+                            status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            loan_application = self.get_object()
+            if loan_application.status == 'pending':
+                loan_application.status = 'approved'
+                loan_application.save()
+                return Response({"status": "Loan application approved successfully."},
+                                status=status.HTTP_200_OK)
+            return Response({"detail": "This application cannot be approved."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        except LoanApplication.DoesNotExist:
+            return Response({"detail": "Loan application not found."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject_application(self, request, pk=None):
+        """
+        Action to reject a loan application.
+        Only accessible by staff users.
+        """
+        if not request.user.is_staff:
+            return Response({"detail": "You do not have permission to perform this action."},
+                            status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            loan_application = self.get_object()
+            if loan_application.status == 'pending':
+                loan_application.status = 'rejected'
+                loan_application.save()
+                return Response({"status": "Loan application rejected successfully."},
+                                status=status.HTTP_200_OK)
+            return Response({"detail": "This application cannot be rejected."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        except LoanApplication.DoesNotExist:
+            return Response({"detail": "Loan application not found."},
+                            status=status.HTTP_404_NOT_FOUND)
 
 
 # A ViewSet for managing loan-related operations.
