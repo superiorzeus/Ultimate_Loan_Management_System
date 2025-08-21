@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Customer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            transition: border-color 0.2s ease-in-out;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
+        .btn-primary {
+            background-color: #2563eb;
+            color: #ffffff;
+            font-weight: 600;
+            padding: 12px 16px;
+            border-radius: 8px;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+        }
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-6">
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg">
+        <h1 class="text-3xl font-extrabold text-gray-900 mb-6 text-center">Add New Customer</h1>
+
+        <!-- Form for creating a new customer -->
+        <form id="addCustomerForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="space-y-4">
+                <!-- User Fields -->
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" id="username" name="username" class="mt-1 form-input" required>
+                </div>
+                <div>
+                    <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                    <input type="text" id="name" name="name" class="mt-1 form-input" required>
+                </div>
+                <div>
+                    <label for="phone_number" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    <input type="tel" id="phone_number" name="phone_number" class="mt-1 form-input" required>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" name="password" class="mt-1 form-input" required>
+                </div>
+
+                <!-- Customer Profile Fields (Required) -->
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="email" name="email" class="mt-1 form-input" required>
+                </div>
+                <div>
+                    <label for="national_id" class="block text-sm font-medium text-gray-700">National ID</label>
+                    <input type="text" id="national_id" name="national_id" class="mt-1 form-input" required>
+                </div>
+                <div>
+                    <label for="address" class="block text-sm font-medium text-gray-700">Address</label>
+                    <input type="text" id="address" name="address" class="mt-1 form-input" required>
+                </div>
+                <div>
+                    <label for="digital_address" class="block text-sm font-medium text-gray-700">Digital Address</label>
+                    <input type="text" id="digital_address" name="digital_address" class="mt-1 form-input" required>
+                </div>
+                <div>
+                    <label for="national_id_front_scan" class="block text-sm font-medium text-gray-700">National ID Front Scan</label>
+                    <input type="file" id="national_id_front_scan" name="national_id_front_scan" class="mt-1 form-input" required>
+                </div>
+                <div>
+                    <label for="national_id_back_scan" class="block text-sm font-medium text-gray-700">National ID Back Scan</label>
+                    <input type="file" id="national_id_back_scan" name="national_id_back_scan" class="mt-1 form-input" required>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn-primary w-full mt-6">
+                    Add Customer
+                </button>
+            </div>
+        </form>
+
+        <!-- Message container for success or error messages -->
+        <div id="message" class="mt-4 text-center text-sm font-medium" style="display: none;"></div>
+
+        <div class="text-center mt-4">
+            <a href="{% url 'dashboard' %}" class="text-blue-600 hover:underline">Back to Dashboard</a>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin;
+
+        // Function to get CSRF token from a cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.startsWith(name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        document.getElementById('addCustomerForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const messageContainer = document.getElementById('message');
+            messageContainer.style.display = 'none';
+
+            // Create a FormData object from the form
+            const formData = new FormData(form);
+
+            // Get the CSRF token from the cookie
+            const csrfToken = getCookie('csrftoken');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/create-customer/`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    messageContainer.textContent = 'Customer added successfully!';
+                    messageContainer.style.color = '#10b981'; // Green color for success
+                    form.reset(); // Reset form fields on success
+                } else {
+                    let errorMessage = 'Failed to add customer. Please check the form and try again.';
+                    if (result && typeof result === 'object') {
+                        // Concatenate all error messages from the API response
+                        errorMessage = Object.keys(result).map(key => {
+                            const errors = result[key].join(', ');
+                            return `${key}: ${errors}`;
+                        }).join(' | ');
+                    }
+                    messageContainer.textContent = errorMessage;
+                    messageContainer.style.color = '#ef4444'; // Red color for error
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                messageContainer.textContent = 'An unexpected error occurred. Please try again later.';
+                messageContainer.style.color = '#ef4444';
+            } finally {
+                messageContainer.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,12 +1,15 @@
 # Django imports
+import requests
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db import transaction
 from django.db.models import Q, F
 from django.utils import timezone
 from django.urls import reverse
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from datetime import timedelta
 
 # Django Rest Framework imports
 from rest_framework import viewsets, status, permissions
@@ -20,7 +23,7 @@ from rest_framework.generics import ListAPIView, UpdateAPIView
 
 # Models imports
 from .models import User, CustomerProfile, LoanType, LoanApplication, Loan, Payment, PaymentSchedule
-from .permissions import IsAdminUser
+from .permissions import IsAdminUser, IsAdminUserOrReadOnly
 
 # Serializers imports
 from .serializers import (
@@ -39,20 +42,33 @@ def index(request):
 # A view for user registration.
 class UserRegisterView(APIView):
     """
-    Handles user registration by creating a new User instance.
+    Handles user registration by creating a new User and CustomerProfile instance.
     This view does not require authentication.
     """
     permission_classes = [AllowAny]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
-        # Pass the request data to the UserSerializer for validation and creation.
-        # This will create both a User and a CustomerProfile.
-        serializer = UserSerializer(data=request.data)
+        serializer = UserRegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            # If the user is successfully created, we can generate a token for them
-            # so they can be logged in automatically after registration.
+            # Create the user but don't save the profile data yet
+            user = serializer.save(is_active=False, is_customer_approved=False)
+            
+            # Now, handle the customer profile data
+            profile_data = {
+                'email': request.data.get('email'),
+                'national_id': request.data.get('national_id'),
+                'address': request.data.get('address'),
+                'digital_address': request.data.get('digital_address'),
+            }
+            # Handle file uploads for the profile
+            profile_data['national_id_front_scan'] = request.FILES.get('national_id_front_scan')
+            profile_data['national_id_back_scan'] = request.FILES.get('national_id_back_scan')
+
+            # Create the customer profile with the new user
+            CustomerProfile.objects.create(user=user, **profile_data)
+            
+            # If the user is successfully created, generate a token
             token, created = Token.objects.get_or_create(user=user)
             # Return a success response with the token and user details.
             return Response({
@@ -63,6 +79,63 @@ class UserRegisterView(APIView):
             }, status=status.HTTP_201_CREATED)
         # If the serializer is not valid, return the validation errors.
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# A view to handle user registration form.
+@csrf_exempt
+def register_view(request):
+    """
+    Handles user registration via a form submission and sends data to the DRF API.
+    """
+    if request.method == 'POST':
+        # Prepare the data for the API. Separating text fields and file fields is best practice.
+        text_data = {
+            'username': request.POST.get('username'),
+            'password': request.POST.get('password'),
+            'name': request.POST.get('name'),
+            'phone_number': request.POST.get('phone_number'),
+            'email': request.POST.get('email'),
+            'national_id': request.POST.get('national_id'),
+            'address': request.POST.get('address'),
+            'digital_address': request.POST.get('digital_address'),
+        }
+
+        # The files dictionary will handle the file uploads.
+        # It's crucial to use request.FILES here.
+        file_data = {
+            'national_id_front_scan': request.FILES.get('national_id_front_scan'),
+            'national_id_back_scan': request.FILES.get('national_id_back_scan'),
+        }
+
+        # Make a POST request to your existing API endpoint
+        url = 'http://127.0.0.1:8000/api/users/register/'
+        
+        try:
+            # Use `data` for text fields and `files` for file uploads
+            # requests.post will automatically set the correct headers for multipart/form-data
+            response = requests.post(url, data=text_data, files=file_data)
+            
+            if response.status_code == 201:
+                return render(request, 'registration_form.html', {
+                    'success_message': 'Registration successful. Your account is pending admin approval.'
+                })
+            else:
+                try:
+                    error_data = response.json()
+                    # Flatten the error messages for display
+                    error_message = ''
+                    for field, errors in error_data.items():
+                        error_message += f"{field}: {', '.join(errors)} "
+                    return render(request, 'registration_form.html', {'error_message': error_message.strip()})
+                except (json.JSONDecodeError, KeyError):
+                    return render(request, 'registration_form.html', {
+                        'error_message': 'An unknown error occurred during registration.'
+                    })
+        except requests.exceptions.RequestException as e:
+            return render(request, 'registration_form.html', {
+                'error_message': f'Request failed: {e}'
+            })
+
+    return render(request, 'registration_form.html', {})
 
 
 # LoginView using ObtainAuthToken
@@ -82,17 +155,6 @@ class LoginView(ObtainAuthToken):
             'is_admin': is_admin
         })
 
-# @csrf_exempt
-# @api_view(['POST'])
-# def logout_view(request):
-#     """
-#     View to log out the user.
-#     """
-#     if request.user.is_authenticated:
-#         request.user.auth_token.delete()
-#         logout(request)
-#         return Response({'success': 'Successfully logged out.'}, status=status.HTTP_200_OK)
-#     return Response({'error': 'Not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
 # Simple view for logout.
 @csrf_exempt
@@ -132,127 +194,99 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
         return obj
 
 
-# A ViewSet for a customer to apply for a loan.
+# A ViewSet for managing loan applications.
 class LoanApplicationViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing loan applications.
-    Customers can create and view their own applications.
-    Admins can see all applications.
+    Admins can create, view, and manage all loan applications.
+    Customers can only create and view their own applications.
     """
     queryset = LoanApplication.objects.all()
     serializer_class = LoanApplicationSerializer
     permission_classes = [IsAuthenticated]
 
-    # This method ensures that customers can only view their own applications.
     def get_queryset(self):
-        # Admins can see all loan applications.
+        """
+        Filters the loan application queryset based on the user's role.
+        """
+        # Admins can view all loan applications.
         if self.request.user.is_staff:
             return LoanApplication.objects.all()
-        # Customers can only see their own loan applications.
-        return LoanApplication.objects.filter(customer=self.request.user)
+        # Customers can only view their own loan applications.
+        return LoanApplication.objects.filter(user=self.request.user)
 
-    # This method automatically assigns the current user as the customer for the application.
+    @transaction.atomic
     def perform_create(self, serializer):
-        # Automatically set the 'customer' field to the current authenticated user.
-        serializer.save(customer=self.request.user)
+        """
+        Custom create method that sets the user on the loan application.
+        """
+        # The user is automatically set to the currently authenticated user
+        serializer.validated_data['user'] = self.request.user
+        serializer.save()
 
 
-# A ViewSet for admins to manage loans.
+# A ViewSet for managing loan-related operations.
 class LoanViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for admins to manage all loans.
-    Admins can approve applications, disburse loans, and view all loan details.
+    ViewSet for managing loans.
+    Admins can create, view, update, and delete loans.
+    Customers can only view their own loans.
     """
     queryset = Loan.objects.all()
     serializer_class = LoanSerializer
-    permission_classes = [IsAdminUser] # Only admins can manage loans.
+    # This permission ensures that only admins can create, update, and delete loans.
+    permission_classes = [IsAuthenticated, IsAdminUserOrReadOnly]
 
-    # This is a custom action to handle the disbursement of a loan.
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
-    @transaction.atomic
-    def disburse(self, request, pk=None):
-        """Disburse a loan and generate its payment schedule."""
-        loan = self.get_object()
-
-        # Check if the loan has already been disbursed.
-        if loan.disbursed:
-            return Response({"error": "This loan has already been disbursed."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        # Set the loan's disbursement status and date.
-        loan.disbursed = True
-        loan.disbursement_date = timezone.now().date()
-        loan.save()
-
-        # Generate the payment schedule for the loan.
-        self.generate_payment_schedule(loan)
-
-        # Return the updated loan details.
-        serializer = self.get_serializer(loan)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def generate_payment_schedule(self, loan):
-        """
-        Generates a monthly payment schedule for a loan based on its terms.
-        """
-        # Calculate the monthly interest rate from the annual rate.
-        monthly_interest_rate = loan.interest_rate / 12 / 100
-        # Calculate the monthly payment using the loan amortization formula.
-        if monthly_interest_rate > 0:
-            monthly_payment = (loan.amount * monthly_interest_rate) / (1 - (1 + monthly_interest_rate)**-loan.term_months)
-        else:
-            monthly_payment = loan.amount / loan.term_months
-            
-        # Get the start date for the schedule.
-        start_date = loan.disbursement_date
-        current_balance = loan.amount
-
-        for month in range(1, loan.term_months + 1):
-            # Calculate the interest due for the current month.
-            interest_due = current_balance * monthly_interest_rate
-            # Calculate the principal due for the current month.
-            principal_due = monthly_payment - interest_due
-            # Update the remaining balance.
-            current_balance -= principal_due
-            
-            # The next due date is one month after the previous one.
-            due_date = start_date + timedelta(days=30 * month)
-
-            # Create the PaymentSchedule entry.
-            PaymentSchedule.objects.create(
-                loan=loan,
-                due_date=due_date,
-                due_amount=monthly_payment,
-                principal_due=principal_due,
-                interest_due=interest_due,
-            )
-
-        # Update the loan's end date.
-        loan.end_date = due_date
-        loan.balance = loan.amount # Initialize balance
-        loan.save()
-        
     def get_queryset(self):
         """
-        This method filters the loans based on the user's role.
-        Admins see all loans. Customers only see loans related to their applications.
+        Filters the loans queryset based on the user's role.
         """
-        # If the user is an admin, show all loans.
+        # Admins can view all loans.
         if self.request.user.is_staff:
             return Loan.objects.all()
-        # Otherwise, show loans associated with the current customer's applications.
-        return Loan.objects.filter(application__customer=self.request.user)
+        # Customers can only view loans related to their own applications.
+        # The correct filter is 'application__user' because the Loan model links to the LoanApplication model.
+        return Loan.objects.filter(application__user=self.request.user)
 
-# A ViewSet for admins to manage payments and for customers to view their payment history.
+    @transaction.atomic
+    def perform_create(self, serializer):
+        """
+        Custom create method that generates a payment schedule after a loan is created.
+        """
+        # Ensure the user is an admin
+        if not self.request.user.is_staff:
+            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+
+        loan = serializer.save()
+        create_payment_schedule(loan)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        """
+        Custom update method that allows admins to update a loan and also generate a payment schedule
+        if one doesn't exist.
+        """
+        # Ensure the user is an admin
+        if not self.request.user.is_staff:
+            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+
+        loan = serializer.save()
+        # If the loan is approved and doesn't have a schedule yet, create one
+        if loan.is_approved and not loan.payment_schedule.exists():
+            create_payment_schedule(loan)
+
+
+# A ViewSet for managing payment-related operations.
 class PaymentViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing payments.
-    Admins can create and view payments for any loan.
-    Customers can only view their own payment history.
+    Admins can create and view all payments.
+    Customers can only view payments related to their loans.
     """
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
-    # This permission ensures that admins can create payments, but customers can only read.
+    # This permission ensures only authenticated users can access this viewset.
+    # The actual access control is handled in get_queryset().
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -262,41 +296,54 @@ class PaymentViewSet(viewsets.ModelViewSet):
         # Admins can view all payments.
         if self.request.user.is_staff:
             return Payment.objects.all()
-        # Customers can only view payments related to their own loans.
-        return Payment.objects.filter(payment_schedule__loan__application__customer=self.request.user)
-
+        # Customers can only view payments related to their loans.
+        # This filter correctly links payments to the user's loan applications.
+        return Payment.objects.filter(payment_schedule__loan__application__user=self.request.user)
+    
+    @transaction.atomic
     def perform_create(self, serializer):
         """
-        Custom create method that records a payment, updates the loan balance,
-        and marks the payment schedule as paid.
+        Custom create method that ensures the payment is tied to a valid schedule,
+        updates the schedule, and sets the admin user who processed the payment.
         """
-        serializer.is_valid(raise_exception=True)
+        # The user must be an admin to record payments.
+        if not self.request.user.is_staff:
+            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Retrieve the payment schedule and its corresponding loan
-        payment_schedule_id = serializer.validated_data.get('payment_schedule').id
-        payment_schedule = get_object_or_404(PaymentSchedule, pk=payment_schedule_id)
-        loan = payment_schedule.loan
+        # Get the payment schedule object from the validated data.
+        payment_schedule = serializer.validated_data.get('payment_schedule')
 
-        # Check if the amount paid is sufficient to cover the due amount
-        if serializer.validated_data.get('amount_paid') < payment_schedule.due_amount:
-            return Response({"error": "Amount paid is less than the scheduled due amount."}, status=status.HTTP_400_BAD_REQUEST)
+        # Check if a payment has already been recorded for this schedule.
+        # This prevents double-processing of payments.
+        if payment_schedule.is_paid:
+            return Response({"detail": "This payment has already been recorded."}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Update the loan balance
-        loan.balance = F('balance') - serializer.validated_data.get('amount_paid')
-        loan.save()
+        # Calculate the amount of principal and interest to be paid off based on the payment amount.
+        amount_to_pay = serializer.validated_data.get('amount_paid')
+        remaining_interest = payment_schedule.interest_due
+        remaining_principal = payment_schedule.principal_due
+        
+        # Pay off interest first.
+        interest_paid = min(amount_to_pay, remaining_interest)
+        principal_paid = 0
 
-        # Mark the payment schedule as paid
-        payment_schedule.is_paid = True
-        payment_schedule.date_paid = timezone.now()
+        if amount_to_pay > remaining_interest:
+            principal_paid = amount_to_pay - interest_paid
+
+        # Update the payment schedule with the new remaining amounts.
+        payment_schedule.interest_due = remaining_interest - interest_paid
+        payment_schedule.principal_due = remaining_principal - principal_paid
+
+        # Check if the payment amount is enough to pay off the full scheduled amount.
+        # Use a small tolerance for float comparison to avoid issues.
+        if payment_schedule.principal_due <= 0.01 and payment_schedule.interest_due <= 0.01:
+            payment_schedule.is_paid = True
+            payment_schedule.date_paid = timezone.now().date()
+        
         payment_schedule.save()
 
-        # The recorded_by field is set by the backend
-        serializer.validated_data['recorded_by'] = self.request.user
-        
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        # Save the payment with the user who processed it.
+        serializer.save(recorded_by=self.request.user)
 
 
 # A ViewSet for a customer to manage their user details and profile.
@@ -411,3 +458,72 @@ def dashboard_view(request):
         'user': request.user
     }
     return render(request, 'dashboard.html', context)
+
+# A View for Admins to create customers
+class AdminCreateCustomerView(APIView):
+    """
+    API view for an admin to create a new customer account directly.
+    """
+    permission_classes = [IsAdminUser]
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        # The data contains all user and customer profile fields
+        serializer = UserRegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            # Create the user and profile
+            user = serializer.save(is_active=True, is_customer_approved=True)
+            return Response({
+                "message": f"Customer '{user.username}' created successfully.",
+                "user_id": user.pk
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# A view to render the add customer page
+@login_required
+def add_customer_view(request):
+    """Renders the page for an admin to add a new customer."""
+    if not request.user.is_staff:
+        # Redirect non-admin users to the dashboard
+        return redirect(reverse('dashboard'))
+    return render(request, 'add_customer.html')
+
+# A view to list all customers (non-staff, non-superuser).
+# This is a good practice to separate concerns from the main UserViewSet.
+class CustomerListView(ListAPIView):
+    """
+    API view to list all non-admin customer users.
+    """
+    queryset = User.objects.filter(is_staff=False, is_superuser=False)
+    serializer_class = UserSerializer
+    permission_classes = [IsAdminUser]
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+def customer_detail_view(request, username):
+    """
+    Renders a detailed view of a specific customer for admin users.
+    """
+    # Use get_object_or_404 to handle cases where the username does not exist
+    customer_user = get_object_or_404(User, username=username)
+
+    # Get related data
+    try:
+        customer_profile = CustomerProfile.objects.get(user=customer_user)
+    except CustomerProfile.DoesNotExist:
+        customer_profile = None
+
+    # Corrected line: 'created_at' is the correct field for sorting by submission date
+    loan_applications = LoanApplication.objects.filter(user=customer_user).order_by('-created_at')
+    loans = Loan.objects.filter(application__user=customer_user).order_by('-disbursement_date')
+    payments = Payment.objects.filter(payment_schedule__loan__application__user=customer_user).order_by('-payment_date')
+
+    context = {
+        'customer_user': customer_user,
+        'customer_profile': customer_profile,
+        'loan_applications': loan_applications,
+        'loans': loans,
+        'payments': payments,
+    }
+
+    return render(request, 'customer_detail.html', context)

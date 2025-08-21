@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Details</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 1000px;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .table-auto {
+            width: 100%;
+        }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+    <!-- Header Section -->
+    <div class="container mx-auto">
+        <div class="flex items-center justify-between mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">
+                Customer Details
+            </h1>
+            <a href="{% url 'dashboard' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                &larr; Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto mt-8 space-y-8">
+        <!-- Customer Profile Section -->
+        <div class="card p-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">User Information</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Username</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ customer_user.username }}</p>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Full Name</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ customer_user.name }}</p>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Phone Number</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ customer_user.phone_number }}</p>
+                </div>
+                {% if customer_profile %}
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Email</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ customer_profile.email }}</p>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">National ID</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ customer_profile.national_id }}</p>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Address</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ customer_profile.address }}</p>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Digital Address</p>
+                    <p class="text-lg font-semibold text-gray-900">{{ customer_profile.digital_address }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Loan Applications Section -->
+        <div class="card p-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">Loan Applications</h2>
+            {% if loan_applications %}
+            <div class="overflow-x-auto rounded-lg">
+                <table class="table-auto min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purpose</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for app in loan_applications %}
+                        <tr class="transition-colors duration-200 hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.amount_requested }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.loan_purpose }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.status }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.submission_date|date:"Y-m-d" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500">No loan applications found.</p>
+            {% endif %}
+        </div>
+
+        <!-- Loans Section -->
+        <div class="card p-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">Active Loans</h2>
+            {% if loans %}
+            <div class="overflow-x-auto rounded-lg">
+                <table class="table-auto min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loan ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Disbursement Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for loan in loans %}
+                        <tr class="transition-colors duration-200 hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.pk }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.amount }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.balance }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.status }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.disbursement_date|date:"Y-m-d" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500">No active loans found.</p>
+            {% endif %}
+        </div>
+        
+        <!-- Payments Section -->
+        <div class="card p-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">Payment History</h2>
+            {% if payments %}
+            <div class="overflow-x-auto rounded-lg">
+                <table class="table-auto min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Paid</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Paid</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loan ID</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for payment in payments %}
+                        <tr class="transition-colors duration-200 hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">{{ payment.pk }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ payment.amount_paid }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ payment.payment_date|date:"Y-m-d H:i:s" }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ payment.payment_schedule.loan.pk }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500">No payments found for this customer.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

@@ -19,7 +19,8 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_admin', True)
-        extra_fields.setdefault('is_approved', True)
+        extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('is_customer_approved', True)
 
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
@@ -34,24 +35,34 @@ class User(AbstractBaseUser, PermissionsMixin):
     name = models.CharField(max_length=255)
     username = models.CharField(max_length=255, unique=True)
     phone_number = models.CharField(max_length=20, unique=True)
-    is_customer = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
-    is_approved = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
+    is_customer_approved = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
 
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['phone_number']
+    REQUIRED_FIELDS = ['phone_number', 'name']
 
     objects = CustomUserManager()
 
     def __str__(self):
         return self.username
+    
+    # Check if the user is a full admin with staff and superuser permissions
+    @property
+    def is_full_admin(self):
+        return self.is_staff and self.is_superuser
+    
+    # Check if the user is an admin
+    @property
+    def is_admin_only(self):
+        return self.is_admin and not self.is_superuser
 
 # Customer Profile Model
 # This model holds the additional details for a customer user
 class CustomerProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name='customer_profile')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='customer_profile')
     national_id = models.CharField(max_length=100)
     email = models.EmailField(blank=True, null=True)
     address = models.TextField()

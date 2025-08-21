@@ -2,21 +2,55 @@ from rest_framework import serializers
 from .models import User, CustomerProfile, LoanApplication, Loan, Payment, LoanType, PaymentSchedule
 from django.db import transaction
 
-# A serializer for the User model specifically for registration.
+# A simple serializer for the CustomerProfile model.
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerProfile
+        fields = '__all__'
+
+# A new serializer for user registration that handles all fields directly.
+# A new serializer for user registration that handles all fields directly.
 class UserRegisterSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(write_only=True)
+    national_id = serializers.CharField(write_only=True)
+    address = serializers.CharField(write_only=True)
+    digital_address = serializers.CharField(write_only=True)
+    # The file fields are now required.
+    national_id_front_scan = serializers.FileField(write_only=True)
+    national_id_back_scan = serializers.FileField(write_only=True)
+    
     class Meta:
         model = User
-        fields = ['username', 'phone_number', 'name', 'password']
+        fields = [
+            'username', 'phone_number', 'name', 'password',
+            'email', 'national_id', 'address', 'digital_address', 
+            'national_id_front_scan', 'national_id_back_scan'
+        ]
         extra_kwargs = {'password': {'write_only': True}}
     
     @transaction.atomic
     def create(self, validated_data):
+        # Pop the fields that belong to the CustomerProfile model
+        profile_data = {
+            'email': validated_data.pop('email'),
+            'national_id': validated_data.pop('national_id'),
+            'address': validated_data.pop('address'),
+            'digital_address': validated_data.pop('digital_address'),
+            'national_id_front_scan': validated_data.pop('national_id_front_scan'),
+            'national_id_back_scan': validated_data.pop('national_id_back_scan'),
+        }
+
+        # Create the User object with the remaining data
         user = User.objects.create_user(
             username=validated_data['username'],
             phone_number=validated_data['phone_number'],
             name=validated_data['name'],
             password=validated_data['password']
         )
+        
+        # Create the CustomerProfile linked to the new user
+        CustomerProfile.objects.create(user=user, **profile_data)
+        
         return user
 
 
@@ -95,7 +129,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         # Added 'is_admin' to fields for the login view check.
-        fields = ['username', 'phone_number', 'name', 'is_customer', 'is_admin', 'is_staff', 'password']
+        fields = ['username', 'phone_number', 'name', 'is_admin', 'is_staff', 'is_customer_approved', 'is_active', 'password']
         extra_kwargs = {'password': {'write_only': True}}
     
     # We will override the create method to make sure the password gets hashed correctly.
@@ -108,14 +142,6 @@ class UserSerializer(serializers.ModelSerializer):
         )
         return user
 
-
-# A simple serializer for the CustomerProfile model.
-class CustomerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CustomerProfile
-        fields = '__all__'
-
-
 # A serializer for the CustomerProfile model.
 class CustomerProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -125,11 +151,11 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
 
 # This serializer combines both User and CustomerProfile.
 class CustomerDetailSerializer(serializers.ModelSerializer):
-    profile = CustomerProfileSerializer(required=False)
+    customer_profile = CustomerProfileSerializer(required=False)
 
     class Meta:
         model = User
-        fields = ['username', 'phone_number', 'name', 'profile']
+        fields = ['username', 'phone_number', 'name', 'customer_profile']
         read_only_fields = ['username', 'phone_number', 'name']
 
     @transaction.atomic
@@ -139,7 +165,7 @@ class CustomerDetailSerializer(serializers.ModelSerializer):
         instance.save()
 
         # Update or create CustomerProfile
-        profile_data = validated_data.pop('profile', None)
+        profile_data = validated_data.pop('customer_profile', None)
         if profile_data:
             customer_profile, created = CustomerProfile.objects.get_or_create(user=instance)
             for attr, value in profile_data.items():

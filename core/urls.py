@@ -4,8 +4,8 @@ from . import views
 from .views import (
     UserViewSet, CustomerProfileViewSet, LoanTypeViewSet,
     LoanApplicationViewSet, LoanViewSet, PaymentViewSet, 
-    UserRegisterView, CustomerViewSet, PaymentScheduleViewSet,
-    index, login_view, dashboard_view, logout_and_redirect
+    UserRegisterView, CustomerViewSet, PaymentScheduleViewSet, register_view,
+    index, login_view, dashboard_view, logout_and_redirect, AdminCreateCustomerView, add_customer_view, CustomerListView, customer_detail_view
 )
 
 
@@ -24,17 +24,30 @@ router.register(r'payment-schedules', PaymentScheduleViewSet)
 urlpatterns = [
     # Custom URL for the main index page
     path('', index, name='index'),
-    # Custom URL for user registration
-    path('register/', UserRegisterView.as_view(), name='register'),
+    # Custom URL for the form-based registration view
+    path('register/', register_view, name='register'),
     # Custom URL for the login view
     path('login/', login_view, name='login'),
     # Custom URL for the dashboard page
     path('dashboard/', dashboard_view, name='dashboard'),
     # Custom URL for the logout view
     path('logout/', views.logout_and_redirect, name='logout'),
-    # path('logout/', logout_view, name='logout'),
+    # URL for the add customer page
+    path('add-customer/', add_customer_view, name='add-customer'),
+    
+    # This is the crucial URL for the DRF API's registration endpoint.
+    # It must be before the `include(router.urls)` line to take precedence.
+    path('api/users/register/', UserRegisterView.as_view(), name='user-register'),
+
+    # URL for admins to create customers directly
+    path('api/admin/create-customer/', AdminCreateCustomerView.as_view(), name='admin-create-customer'),
+
+    # URL to list all customers specifically for the admin dashboard
+    path('api/customers/list/', CustomerListView.as_view(), name='customer-list'),
+
+    # URL to show the detail page for a specific customer
+    path('customers/<str:username>/', views.customer_detail_view, name='customer-detail'),
     
     # Include the router-generated URLs
     path('api/', include(router.urls)),
 ]
-

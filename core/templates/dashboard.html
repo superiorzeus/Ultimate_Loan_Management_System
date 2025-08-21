@@ -32,6 +32,19 @@
             color: #2563eb;
             font-weight: 600;
         }
+        .btn-primary {
+            background-color: #2563eb;
+            color: #ffffff;
+            font-weight: 600;
+            padding: 12px 16px;
+            border-radius: 8px;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body class="p-6 md:p-12">
@@ -44,6 +57,7 @@
         </div>
         <!-- Logout button as a form to use POST method -->
         <form action="{% url 'logout' %}" method="post">
+            {% csrf_token %}
             <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
                 Logout
             </button>
@@ -116,10 +130,11 @@
                                     <th scope="col" class="py-3">Payment ID</th>
                                     <th scope="col" class="py-3">Amount</th>
                                     <th scope="col" class="py-3">Date</th>
+                                    <th scope="col" class="py-3">Recorded By</th>
                                 </tr>
                             </thead>
                             <tbody id="dashboard-payments-table-body" class="bg-white divide-y divide-gray-200">
-                                <tr><td colspan="3" class="text-center py-4 text-gray-500">Loading payments...</td></tr>
+                                <tr><td colspan="4" class="text-center py-4 text-gray-500">Loading payments...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -135,13 +150,14 @@
                             <thead>
                                 <tr>
                                     <th scope="col" class="py-3">Application ID</th>
+                                    <th scope="col" class="py-3">Customer</th>
                                     <th scope="col" class="py-3">Amount</th>
                                     <th scope="col" class="py-3">Status</th>
                                     <th scope="col" class="py-3">Date</th>
                                 </tr>
                             </thead>
                             <tbody id="dashboard-applications-table-body" class="bg-white divide-y divide-gray-200">
-                                <tr><td colspan="4" class="text-center py-4 text-gray-500">Loading applications...</td></tr>
+                                <tr><td colspan="5" class="text-center py-4 text-gray-500">Loading applications...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -152,6 +168,12 @@
         <!-- Manage Customers Section -->
         <div id="customers-view" class="view-section hidden">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Customers</h2>
+            <!-- New 'Add New Customer' button for staff members -->
+            {% if user.is_staff %}
+            <a href="{% url 'add-customer' %}" class="btn-primary inline-block mb-4">
+                Add New Customer
+            </a>
+            {% endif %}
             <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -170,7 +192,7 @@
                 </div>
             </div>
         </div>
-
+        
         <!-- Manage Loans Section -->
         <div id="loans-view" class="view-section hidden">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Loans</h2>
@@ -182,13 +204,12 @@
                                 <th scope="col" class="py-3">Loan ID</th>
                                 <th scope="col" class="py-3">Customer</th>
                                 <th scope="col" class="py-3">Amount</th>
-                                <th scope="col" class="py-3">Balance</th>
-                                <th scope="col" class="py-3">Disbursed</th>
+                                <th scope="col" class="py-3">Status</th>
                                 <th scope="col" class="py-3">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="loans-table-body" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="6" class="text-center py-4 text-gray-500">Loading loans...</td></tr>
+                            <tr><td colspan="5" class="text-center py-4 text-gray-500">Loading loans...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -197,7 +218,7 @@
 
         <!-- Manage Applications Section -->
         <div id="applications-view" class="view-section hidden">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Loan Applications</h2>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Applications</h2>
             <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -228,13 +249,14 @@
                         <thead>
                             <tr>
                                 <th scope="col" class="py-3">Payment ID</th>
-                                <th scope="col" class="py-3">Loan ID</th>
-                                <th scope="col" class="py-3">Amount Paid</th>
+                                <th scope="col" class="py-3">Loan</th>
+                                <th scope="col" class="py-3">Amount</th>
                                 <th scope="col" class="py-3">Date</th>
+                                <th scope="col" class="py-3">Recorded By</th>
                             </tr>
                         </thead>
                         <tbody id="payments-table-body" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="4" class="text-center py-4 text-gray-500">Loading payments...</td></tr>
+                            <tr><td colspan="5" class="text-center py-4 text-gray-500">Loading payments...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -242,176 +264,213 @@
         </div>
     </main>
 
+    <!-- Generic Modal for messages -->
+    <div id="message-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" aria-hidden="true"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block px-4 pt-5 pb-4 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-sm sm:w-full sm:p-6">
+                <div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 class="text-lg font-medium leading-6 text-gray-900" id="modal-title"></h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500" id="modal-message"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="closeModal()">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        const formatCurrency = (amount) => {
-            return new Intl.NumberFormat('en-US', {
-                style: 'USD',
-                currency: 'USD',
-                minimumFractionDigits: 2
-            }).format(amount);
+        const API_BASE_URL = window.location.origin;
+
+        // Function to show the custom modal
+        const showModal = (title, message) => {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            document.getElementById('message-modal').classList.remove('hidden');
         };
 
-        const fetchAllData = async () => {
-            try {
-                // Fetch data from all necessary API endpoints concurrently
-                const [customersResponse, loansResponse, applicationsResponse, paymentsResponse] = await Promise.all([
-                    fetch('/api/customers/'),
-                    fetch('/api/loans/'),
-                    fetch('/api/loan-applications/'),
-                    fetch('/api/payments/')
-                ]);
+        // Function to close the custom modal
+        const closeModal = () => {
+            document.getElementById('message-modal').classList.add('hidden');
+        };
 
-                if (!customersResponse.ok || !loansResponse.ok || !applicationsResponse.ok || !paymentsResponse.ok) {
-                    throw new Error('Failed to fetch data from one or more API endpoints.');
+        const formatCurrency = (amount) => {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        };
+
+        const fetchDashboardData = async () => {
+            try {
+                // Fetch summary statistics
+                const summaryResponse = await fetch(`${API_BASE_URL}/api/summary/`);
+                const summary = await summaryResponse.json();
+                document.getElementById('total-loans-card').querySelector('p').innerText = summary.total_loans;
+                document.getElementById('loans-paid-card').querySelector('p').innerText = summary.paid_loans;
+                document.getElementById('loans-pending-card').querySelector('p').innerText = summary.pending_applications;
+
+                // Fetch recent payments
+                const paymentsResponse = await fetch(`${API_BASE_URL}/api/payments/`);
+                const payments = await paymentsResponse.json();
+                const dashboardPaymentsTableBody = document.getElementById('dashboard-payments-table-body');
+                if (payments.length > 0) {
+                    const paymentsHtml = payments.slice(0, 5).map(payment => `
+                        <tr class="transition-colors duration-200 hover:bg-gray-50">
+                            <td>${payment.id}</td>
+                            <td>${formatCurrency(payment.amount_paid)}</td>
+                            <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
+                            <td>${payment.recorded_by_name || 'N/A'}</td>
+                        </tr>
+                    `).join('');
+                    dashboardPaymentsTableBody.innerHTML = paymentsHtml;
+                } else {
+                    dashboardPaymentsTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No recent payments found.</td></tr>';
                 }
 
-                const [customers, loans, applications, payments] = await Promise.all([
-                    customersResponse.json(),
-                    loansResponse.json(),
-                    applicationsResponse.json(),
-                    paymentsResponse.json()
-                ]);
-
-                // Update all views with the fetched data
-                updateDashboard(loans, applications, payments);
-                updateCustomersTable(customers);
-                updateLoansTable(loans, customers);
-                updateApplicationsTable(applications, customers);
-                updatePaymentsTable(payments, loans);
-
+                // Fetch recent applications
+                const applicationsResponse = await fetch(`${API_BASE_URL}/api/loan-applications/`);
+                const applications = await applicationsResponse.json();
+                const dashboardApplicationsTableBody = document.getElementById('dashboard-applications-table-body');
+                if (applications.length > 0) {
+                    const applicationsHtml = applications.slice(0, 5).map(app => `
+                        <tr class="transition-colors duration-200 hover:bg-gray-50">
+                            <td>${app.id}</td>
+                            <td>${formatCurrency(app.amount)}</td>
+                            <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
+                            <td>${new Date(app.date_created).toLocaleDateString()}</td>
+                        </tr>
+                    `).join('');
+                    dashboardApplicationsTableBody.innerHTML = applicationsHtml;
+                } else {
+                    dashboardApplicationsTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No recent applications found.</td></tr>';
+                }
             } catch (error) {
-                console.error('Error fetching dashboard data:', error);
-                // Display error messages on all tables
-                document.getElementById('dashboard-payments-table-body').innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">Error loading data.</td></tr>`;
-                document.getElementById('dashboard-applications-table-body').innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-500">Error loading data.</td></tr>`;
-                document.getElementById('customers-table-body').innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-500">Error loading data.</td></tr>`;
-                document.getElementById('loans-table-body').innerHTML = `<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading data.</td></tr>`;
-                document.getElementById('applications-table-body').innerHTML = `<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading data.</td></tr>`;
-                document.getElementById('payments-table-body').innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-500">Error loading data.</td></tr>`;
+                console.error("Failed to fetch dashboard data:", error);
+                document.getElementById('dashboard-payments-table-body').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
+                document.getElementById('dashboard-applications-table-body').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
             }
         };
 
-        const updateDashboard = (loans, applications, payments) => {
-            const totalLoans = loans.length;
-            const loansPaid = loans.filter(loan => loan.balance <= 0).length;
-            const loansPending = applications.filter(app => app.status === 'pending').length;
-
-            document.getElementById('total-loans-card').querySelector('p').textContent = totalLoans;
-            document.getElementById('loans-paid-card').querySelector('p').textContent = loansPaid;
-            document.getElementById('loans-pending-card').querySelector('p').textContent = loansPending;
-            
-            // Populate Recent Payments Table
-            const dashboardPaymentsTableBody = document.getElementById('dashboard-payments-table-body');
-            if (payments.length > 0) {
-                const recentPayments = payments.sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date)).slice(0, 5);
-                const paymentsHtml = recentPayments.map(payment => `
-                    <tr class="transition-colors duration-200 hover:bg-gray-50">
-                        <td>${payment.id}</td>
-                        <td class="font-medium">${formatCurrency(payment.amount_paid)}</td>
-                        <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
-                    </tr>
-                `).join('');
-                dashboardPaymentsTableBody.innerHTML = paymentsHtml;
-            } else {
-                dashboardPaymentsTableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-500">No recent payments.</td></tr>';
-            }
-
-            // Populate Recent Applications Table
-            const dashboardApplicationsTableBody = document.getElementById('dashboard-applications-table-body');
-            if (applications.length > 0) {
-                const recentApplications = applications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
-                const applicationsHtml = recentApplications.map(app => `
-                    <tr class="transition-colors duration-200 hover:bg-gray-50">
-                        <td>${app.id}</td>
-                        <td class="font-medium">${formatCurrency(app.amount)}</td>
-                        <td class="capitalize">${app.status}</td>
-                        <td>${new Date(app.created_at).toLocaleDateString()}</td>
-                    </tr>
-                `).join('');
-                dashboardApplicationsTableBody.innerHTML = applicationsHtml;
-            } else {
-                dashboardApplicationsTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No recent applications.</td></tr>';
-            }
-        };
-
-        const updateCustomersTable = (customers) => {
+        const fetchCustomers = async () => {
             const customersTableBody = document.getElementById('customers-table-body');
-            if (customers.length > 0) {
-                const customersHtml = customers.map(customer => `
-                    <tr class="transition-colors duration-200 hover:bg-gray-50">
-                        <td>${customer.name || 'N/A'}</td>
-                        <td>${customer.username}</td>
-                        <td>${customer.phone_number}</td>
-                        <td class="whitespace-nowrap">
-                            <button class="text-blue-600 hover:text-blue-900 font-medium">View Details</button>
-                        </td>
-                    </tr>
-                `).join('');
-                customersTableBody.innerHTML = customersHtml;
-            } else {
-                customersTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No customers found.</td></tr>';
+            customersTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Loading customers...</td></tr>';
+            try {
+                // UPDATE: Use the new endpoint to fetch customers
+                const response = await fetch(`${API_BASE_URL}/api/customers/list/`);
+                if (!response.ok) {
+                    console.error(`Failed to fetch customers: HTTP Status ${response.status} - ${response.statusText}`);
+                    throw new Error(`Network response was not ok. Status: ${response.status}`);
+                }
+                const customers = await response.json();
+                
+                if (customers.length > 0) {
+                    const customersHtml = customers.map(customer => `
+                        <tr class="transition-colors duration-200 hover:bg-gray-50">
+                            <td>${customer.name}</td>
+                            <td>${customer.username}</td>
+                            <td>${customer.phone_number}</td>
+                            <td><a href="/customers/${customer.username}/" class="text-blue-600 hover:underline">View</a></td>
+                        </tr>
+                    `).join('');
+                    customersTableBody.innerHTML = customersHtml;
+                } else {
+                    customersTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No customers found.</td></tr>';
+                }
+            } catch (error) {
+                console.error("Failed to fetch customers:", error);
+                customersTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
             }
         };
 
-        const updateLoansTable = (loans, customers) => {
-            const loansTableBody = document.getElementById('loans-table-body');
-            const customerMap = new Map(customers.map(c => [c.id, c.name]));
-            if (loans.length > 0) {
-                const loansHtml = loans.map(loan => `
-                    <tr class="transition-colors duration-200 hover:bg-gray-50">
-                        <td>${loan.id}</td>
-                        <td>${customerMap.get(loan.application.applicant) || 'N/A'}</td>
-                        <td class="font-medium">${formatCurrency(loan.amount)}</td>
-                        <td class="font-medium">${formatCurrency(loan.balance)}</td>
-                        <td>${loan.disbursed ? 'Yes' : 'No'}</td>
-                        <td class="whitespace-nowrap">
-                            <button class="text-blue-600 hover:text-blue-900 font-medium">View Details</button>
-                        </td>
-                    </tr>
-                `).join('');
-                loansTableBody.innerHTML = loansHtml;
-            } else {
-                loansTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No loans found.</td></tr>';
-            }
-        };
-
-        const updateApplicationsTable = (applications, customers) => {
+        const fetchApplications = async () => {
             const applicationsTableBody = document.getElementById('applications-table-body');
-            const customerMap = new Map(customers.map(c => [c.id, c.name]));
-            if (applications.length > 0) {
+            applicationsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Loading applications...</td></tr>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/loan-applications/`);
+                if (!response.ok) {
+                    console.error(`Failed to fetch applications: HTTP Status ${response.status} - ${response.statusText}`);
+                    throw new Error(`Network response was not ok. Status: ${response.status}`);
+                }
+                const applications = await response.json();
+                
                 const applicationsHtml = applications.map(app => `
                     <tr class="transition-colors duration-200 hover:bg-gray-50">
                         <td>${app.id}</td>
-                        <td>${customerMap.get(app.applicant) || 'N/A'}</td>
-                        <td class="font-medium">${formatCurrency(app.amount)}</td>
-                        <td class="capitalize">${app.status}</td>
-                        <td>${new Date(app.created_at).toLocaleDateString()}</td>
-                        <td class="whitespace-nowrap">
-                            <button class="text-blue-600 hover:text-blue-900 font-medium">Review</button>
+                        <td>${app.customer_name}</td>
+                        <td>${formatCurrency(app.amount)}</td>
+                        <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
+                        <td>${new Date(app.date_created).toLocaleDateString()}</td>
+                        <td>
+                            <a href="#" onclick="showModal('View Application', 'Viewing application #${app.id}')" class="text-blue-600 hover:underline">View</a>
                         </td>
                     </tr>
                 `).join('');
-                applicationsTableBody.innerHTML = applicationsHtml;
-            } else {
-                applicationsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No applications found.</td></tr>';
+                applicationsTableBody.innerHTML = applicationsHtml || '<tr><td colspan="6" class="text-center py-4 text-gray-500">No applications found.</td></tr>';
+            } catch (error) {
+                console.error("Failed to fetch applications:", error);
+                applicationsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
+            }
+        };
+        
+        const fetchLoans = async () => {
+            const loansTableBody = document.getElementById('loans-table-body');
+            loansTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Loading loans...</td></tr>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/loans/`);
+                if (!response.ok) {
+                    console.error(`Failed to fetch loans: HTTP Status ${response.status} - ${response.statusText}`);
+                    throw new Error(`Network response was not ok. Status: ${response.status}`);
+                }
+                const loans = await response.json();
+                
+                const loansHtml = loans.map(loan => `
+                    <tr class="transition-colors duration-200 hover:bg-gray-50">
+                        <td>${loan.id}</td>
+                        <td>${loan.customer_name}</td>
+                        <td>${formatCurrency(loan.loan_application.amount)}</td>
+                        <td class="${loan.is_paid ? 'text-green-600' : 'text-red-600'} capitalize">${loan.is_paid ? 'Paid' : 'Unpaid'}</td>
+                        <td>
+                            <a href="#" onclick="showModal('View Loan', 'Viewing loan #${loan.id}')" class="text-blue-600 hover:underline">View</a>
+                        </td>
+                    </tr>
+                `).join('');
+                loansTableBody.innerHTML = loansHtml || '<tr><td colspan="5" class="text-center py-4 text-gray-500">No loans found.</td></tr>';
+            } catch (error) {
+                console.error("Failed to fetch loans:", error);
+                loansTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
             }
         };
 
-        const updatePaymentsTable = (payments, loans) => {
+        const fetchPayments = async () => {
             const paymentsTableBody = document.getElementById('payments-table-body');
-            const loanMap = new Map(loans.map(l => [l.id, l.id])); 
-            if (payments.length > 0) {
+            paymentsTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Loading payments...</td></tr>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/payments/`);
+                if (!response.ok) {
+                    console.error(`Failed to fetch payments: HTTP Status ${response.status} - ${response.statusText}`);
+                    throw new Error(`Network response was not ok. Status: ${response.status}`);
+                }
+                const payments = await response.json();
+
                 const paymentsHtml = payments.map(payment => `
                     <tr class="transition-colors duration-200 hover:bg-gray-50">
                         <td>${payment.id}</td>
-                        <td>${payment.payment_schedule.loan}</td>
-                        <td class="font-medium">${formatCurrency(payment.amount_paid)}</td>
+                        <td>${payment.loan.id}</td>
+                        <td>${formatCurrency(payment.amount_paid)}</td>
                         <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
+                        <td>${payment.recorded_by_name || 'N/A'}</td>
                     </tr>
                 `).join('');
-                paymentsTableBody.innerHTML = paymentsHtml;
-            } else {
-                paymentsTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No payments found.</td></tr>';
+                paymentsTableBody.innerHTML = paymentsHtml || '<tr><td colspan="5" class="text-center py-4 text-gray-500">No payments found.</td></tr>';
+            } catch (error) {
+                console.error("Failed to fetch payments:", error);
+                paymentsTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
             }
         };
 
@@ -425,11 +484,23 @@
 
             document.getElementById(`${viewId}-view`).classList.remove('hidden');
             document.getElementById(`${viewId}-tab`).classList.add('active');
+            
+            // Trigger data fetching for the selected view
+            if (viewId === 'dashboard') {
+                fetchDashboardData();
+            } else if (viewId === 'customers') {
+                fetchCustomers();
+            } else if (viewId === 'applications') {
+                fetchApplications();
+            } else if (viewId === 'loans') {
+                fetchLoans();
+            } else if (viewId === 'payments') {
+                fetchPayments();
+            }
         };
 
         // Fetch data and show the dashboard view on load
         document.addEventListener('DOMContentLoaded', () => {
-            fetchAllData();
             showView('dashboard');
         });
     </script>
