@@ -549,3 +549,13 @@ class SummaryViewSet(viewsets.GenericViewSet, mixins.ListModelMixin):
         
         serializer = self.get_serializer(summary_data)
         return Response(serializer.data)
+
+@login_required
+def create_loan_application_view(request):
+    """
+    Renders the form for creating a new loan application.
+    """
+    context = {
+        'user': request.user
+    }
+    return render(request, 'loan_application_form.html', context)

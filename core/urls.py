@@ -5,7 +5,8 @@ from .views import (
     UserViewSet, CustomerProfileViewSet, LoanTypeViewSet,
     LoanApplicationViewSet, LoanViewSet, PaymentViewSet, 
     UserRegisterView, CustomerViewSet, PaymentScheduleViewSet, register_view,
-    index, login_view, dashboard_view, logout_and_redirect, AdminCreateCustomerView, add_customer_view, CustomerListView, customer_detail_view, SummaryViewSet
+    index, login_view, dashboard_view, logout_and_redirect, AdminCreateCustomerView, add_customer_view, CustomerListView, customer_detail_view, SummaryViewSet,
+    create_loan_application_view
 )
 
 
@@ -50,6 +51,9 @@ urlpatterns = [
 
     # URL to show the detail page for a specific customer
     path('customers/<str:username>/', views.customer_detail_view, name='customer-detail'),
+
+    # URL for the loan application form page
+    path('add-loan-application/', views.create_loan_application_view, name='add-loan-application'),
     
     # Include the router-generated URLs
     path('api/', include(router.urls)),
