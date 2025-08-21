@@ -107,16 +107,18 @@ class LoanSerializer(serializers.ModelSerializer):
 
 
 # A serializer for the LoanApplication model.
+# A serializer for the LoanApplication model.
 class LoanApplicationSerializer(serializers.ModelSerializer):
-    # This serializer now uses a PrimaryKeyRelatedField for the user's customer profile.
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    # This field is now writable. An admin can send a user ID.
+    # The queryset limits the choices to active users.
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True))
     loan_type = serializers.PrimaryKeyRelatedField(queryset=LoanType.objects.all())
     loan = LoanSerializer(read_only=True)
 
     class Meta:
         model = LoanApplication
         fields = ['id', 'user', 'loan_type', 'amount', 'status', 'created_at', 'loan']
-        read_only_fields = ['user', 'status', 'created_at']
+        read_only_fields = ['status', 'created_at']
 
 # A serializer for approving a loan application.
 class LoanApplicationApproveSerializer(serializers.Serializer):

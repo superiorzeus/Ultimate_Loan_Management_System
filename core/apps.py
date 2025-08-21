@@ -31,4 +31,3 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
     # Only create a token if a new user instance has been created.
     if created:
         Token.objects.create(user=instance)
-

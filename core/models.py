@@ -78,11 +78,12 @@ class CustomerProfile(models.Model):
 # This model allows admins to define different loan products
 class LoanType(models.Model):
     INTEREST_RATE_CHOICES = [
-        ('monthly', 'Monthly'),
-        ('flat', 'Flat'),
+        ('flat_rate', 'Flat Rate'),
+        ('monthly_rate', 'Monthly Rate'),
+        ('yearly_rate', 'Yearly Rate'),
     ]
     name = models.CharField(max_length=100)
-    interest_rate_type = models.CharField(max_length=10, choices=INTEREST_RATE_CHOICES)
+    interest_rate_type = models.CharField(max_length=50, choices=INTEREST_RATE_CHOICES)
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2)
     term_months = models.IntegerField()
 

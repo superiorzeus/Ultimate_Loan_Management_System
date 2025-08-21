@@ -19,7 +19,7 @@ from rest_framework.decorators import action, api_view
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
-from rest_framework.generics import ListAPIView, UpdateAPIView
+from rest_framework.generics import ListAPIView, UpdateAPIView, ListCreateAPIView
 
 # Models imports
 from .models import User, CustomerProfile, LoanType, LoanApplication, Loan, Payment, PaymentSchedule
@@ -219,108 +219,133 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """
         Custom create method that sets the user on the loan application.
+        The user is automatically set for regular customers, but an admin
+        can specify a different user.
         """
-        # The user is automatically set to the currently authenticated user
-        if not self.request.user.is_staff:
-            serializer.validated_data['user'] = self.request.user
-        serializer.save()
-
-    @action(detail=True, methods=['post'], url_path='approve')
-    def approve_application(self, request, pk=None):
-        """
-        Action to approve a loan application.
-        Only accessible by staff users.
-        """
-        if not request.user.is_staff:
-            return Response({"detail": "You do not have permission to perform this action."},
-                            status=status.HTTP_403_FORBIDDEN)
-        
-        try:
-            loan_application = self.get_object()
-            if loan_application.status == 'pending':
-                loan_application.status = 'approved'
-                loan_application.save()
-                return Response({"status": "Loan application approved successfully."},
-                                status=status.HTTP_200_OK)
-            return Response({"detail": "This application cannot be approved."},
-                            status=status.HTTP_400_BAD_REQUEST)
-        except LoanApplication.DoesNotExist:
-            return Response({"detail": "Loan application not found."},
-                            status=status.HTTP_404_NOT_FOUND)
-
-    @action(detail=True, methods=['post'], url_path='reject')
-    def reject_application(self, request, pk=None):
-        """
-        Action to reject a loan application.
-        Only accessible by staff users.
-        """
-        if not request.user.is_staff:
-            return Response({"detail": "You do not have permission to perform this action."},
-                            status=status.HTTP_403_FORBIDDEN)
-        
-        try:
-            loan_application = self.get_object()
-            if loan_application.status == 'pending':
-                loan_application.status = 'rejected'
-                loan_application.save()
-                return Response({"status": "Loan application rejected successfully."},
-                                status=status.HTTP_200_OK)
-            return Response({"detail": "This application cannot be rejected."},
-                            status=status.HTTP_400_BAD_REQUEST)
-        except LoanApplication.DoesNotExist:
-            return Response({"detail": "Loan application not found."},
-                            status=status.HTTP_404_NOT_FOUND)
+        # Check if the authenticated user is an admin.
+        if self.request.user.is_staff:
+            # If the admin has provided a user in the request data, use it.
+            # Otherwise, raise an error. The serializer will handle validation.
+            # We don't need to do anything here as the serializer handles the 'user' field directly.
+            loan_application = serializer.save()
+        else:
+            # If the user is not an admin, automatically link the application to them.
+            loan_application = serializer.save(user=self.request.user)
+            
+        # Create a Loan object with a 'pending' status after the application is saved.
+        # This part of the code is now more robust.
+        Loan.objects.create(
+            application=loan_application,
+            amount=loan_application.amount,
+            interest_rate=loan_application.loan_type.interest_rate,
+            term_months=loan_application.loan_type.term_months,
+            balance=loan_application.amount, # Initial balance is just the amount
+            start_date=timezone.now().date(),
+        )
 
 
-# A ViewSet for managing loan-related operations.
+# A ViewSet for managing loans.
 class LoanViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing loans.
-    Admins can create, view, update, and delete loans.
-    Customers can only view their own loans.
-    """
     queryset = Loan.objects.all()
     serializer_class = LoanSerializer
-    # This permission ensures that only admins can create, update, and delete loans.
-    permission_classes = [IsAuthenticated, IsAdminUserOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Filters the loans queryset based on the user's role.
-        """
-        # Admins can view all loans.
+        # Admins can view all loans
         if self.request.user.is_staff:
             return Loan.objects.all()
-        # Customers can only view loans related to their own applications.
-        # The correct filter is 'application__user' because the Loan model links to the LoanApplication model.
+        # Customers can only view their own loans
         return Loan.objects.filter(application__user=self.request.user)
 
     @transaction.atomic
-    def perform_create(self, serializer):
+    @action(detail=True, methods=['post'], url_path='disburse')
+    def disburse(self, request, pk=None):
         """
-        Custom create method that generates a payment schedule after a loan is created.
+        Action to disburse a loan and generate its payment schedule.
+        Only accessible by staff users.
         """
-        # Ensure the user is an admin
-        if not self.request.user.is_staff:
-            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+        if not request.user.is_staff:
+            return Response({"detail": "You do not have permission to perform this action."},
+                            status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            loan = self.get_object()
+            loan_application = loan.loan_application
+            loan_type = loan_application.loan_type
 
-        loan = serializer.save()
-        create_payment_schedule(loan)
+            # Check if the loan has already been disbursed
+            if loan.disbursement_date:
+                return Response({"detail": "This loan has already been disbursed."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update loan's status and disbursement date
+            loan.status = 'active'
+            loan.disbursement_date = timezone.now()
+            
+            total_amount = float(loan_application.amount)
+            interest_rate = float(loan_type.interest_rate) / 100
+            term_months = loan_type.term_months
+            
+            # --- Payment Schedule Calculation Logic based on your rules ---
+            if loan_type.interest_rate_type == 'flat_rate':
+                total_interest = total_amount * interest_rate
+                total_payable = total_amount + total_interest
+                monthly_installment = total_payable / term_months
+                
+                # Generate a schedule for each month
+                for i in range(term_months):
+                    PaymentSchedule.objects.create(
+                        loan=loan,
+                        due_date=loan.disbursement_date + timedelta(days=(i + 1) * 30),
+                        amount_due=monthly_installment
+                    )
 
-    @transaction.atomic
-    def perform_update(self, serializer):
-        """
-        Custom update method that allows admins to update a loan and also generate a payment schedule
-        if one doesn't exist.
-        """
-        # Ensure the user is an admin
-        if not self.request.user.is_staff:
-            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+            elif loan_type.interest_rate_type == 'monthly_rate':
+                # Simple monthly interest
+                monthly_rate = interest_rate
+                remaining_balance = total_amount
+                
+                for i in range(term_months):
+                    interest_for_month = remaining_balance * monthly_rate
+                    # To calculate a fixed monthly payment for simple interest:
+                    # Let's assume a simple amortization where principal is evenly spread
+                    principal_for_month = total_amount / term_months
+                    monthly_installment = principal_for_month + interest_for_month
+                    
+                    PaymentSchedule.objects.create(
+                        loan=loan,
+                        due_date=loan.disbursement_date + timedelta(days=(i + 1) * 30),
+                        amount_due=monthly_installment
+                    )
+                    remaining_balance -= principal_for_month
 
-        loan = serializer.save()
-        # If the loan is approved and doesn't have a schedule yet, create one
-        if loan.is_approved and not loan.payment_schedule.exists():
-            create_payment_schedule(loan)
+            elif loan_type.interest_rate_type == 'yearly_rate':
+                # Convert yearly rate to monthly rate and apply simple interest
+                monthly_rate = (interest_rate / 12)
+                remaining_balance = total_amount
+                
+                for i in range(term_months):
+                    interest_for_month = remaining_balance * monthly_rate
+                    principal_for_month = total_amount / term_months
+                    monthly_installment = principal_for_month + interest_for_month
+                    
+                    PaymentSchedule.objects.create(
+                        loan=loan,
+                        due_date=loan.disbursement_date + timedelta(days=(i + 1) * 30),
+                        amount_due=monthly_installment
+                    )
+                    remaining_balance -= principal_for_month
+
+            loan.save()
+            return Response({"status": "Loan disbursed and payment schedule generated."},
+                            status=status.HTTP_200_OK)
+
+        except Loan.DoesNotExist:
+            return Response({"detail": "Loan not found."},
+                            status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"detail": f"An error occurred: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # A ViewSet for managing payment-related operations.
@@ -448,14 +473,19 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser] # Only admins can manage users.
 
 
-# A ViewSet for admins to manage loan types.
-class LoanTypeViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for admins to manage loan types.
-    """
+# This ViewSet is for the API endpoint that serves the list of loan types to the public form.
+class LoanTypeViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = LoanType.objects.all()
+    serializer_class = LoanTypeSerializer
+
+# A view for managing loan types for admins
+class LoanTypeManageView(ListCreateAPIView):
     queryset = LoanType.objects.all()
     serializer_class = LoanTypeSerializer
     permission_classes = [IsAdminUser]
+
+    def perform_create(self, serializer):
+        serializer.save()
 
 
 # A ViewSet for both admins and customers to view payment schedules.

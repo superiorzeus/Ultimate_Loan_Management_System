@@ -110,7 +110,6 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const API_BASE_URL = window.location.origin;
-            // Check if the user is an admin
             const userIsAdmin = "{{ request.user.is_staff }}" === "True";
             
             const loanTypeSelect = document.getElementById('loan-type');
@@ -177,17 +176,21 @@
             document.getElementById('loan-application-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
-                const formData = new FormData(e.target);
-                const data = Object.fromEntries(formData.entries());
+                // Check if a customer is selected for admins
+                if (userIsAdmin && !userSelect.value) {
+                    showMessage('Please select a customer to submit the application.', 'bg-red-100 text-red-700');
+                    return; // Stop the function here
+                }
 
                 const payload = {
-                    loan_type: data.loan_type,
-                    amount: data.amount,
+                    loan_type: loanTypeSelect.value,
+                    amount: document.getElementById('amount').value,
                 };
 
                 // Set the user field based on who is logged in
                 if (userIsAdmin) {
-                    payload.user = data.user;
+                    // Ensure a valid number is sent
+                    payload.user = parseInt(userSelect.value);
                 } else {
                     // For customers, the user is the authenticated user
                     payload.user = "{{ request.user.id }}";

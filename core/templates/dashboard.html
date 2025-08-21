@@ -77,6 +77,9 @@
             <li class="mr-2">
                 <button id="payments-tab" class="tab-button inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300" onclick="showView('payments')">Manage Payments</button>
             </li>
+            <li class="mr-2">
+                <button id="loan-types-tab" class="tab-button inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300" onclick="showView('loan-types')">Manage Loan Types</button>
+            </li>
         </ul>
     </nav>
 
@@ -249,6 +252,60 @@
                 </div>
             </div>
         </div>
+        
+        <div id="loan-types-view" class="view-section hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Manage Loan Types</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Create New Loan Type</h3>
+                    <form id="create-loan-type-form" class="space-y-4">
+                        {% csrf_token %}
+                        <div>
+                            <label for="type-name" class="block text-sm font-medium text-gray-700">Name</label>
+                            <input type="text" id="type-name" name="name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="type-interest-rate" class="block text-sm font-medium text-gray-700">Interest Rate (%)</label>
+                            <input type="number" id="type-interest-rate" name="interest_rate" required step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="type-interest-type" class="block text-sm font-medium text-gray-700">Interest Type</label>
+                            <select id="type-interest-type" name="interest_rate_type" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="flat_rate">Flat Rate</option>
+                                <option value="monthly_rate">Monthly Rate</option>
+                                <option value="yearly_rate">Yearly Rate</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="type-term" class="block text-sm font-medium text-gray-700">Term (in Months)</label>
+                            <input type="number" id="type-term" name="term_months" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <button type="submit" class="btn-primary w-full">Create Loan Type</button>
+                    </form>
+                    <div id="loan-type-message" class="mt-4 p-4 rounded-md text-sm" role="alert" style="display: none;"></div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <h3 class="p-6 text-xl font-semibold text-gray-800">Existing Loan Types</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="py-3">Name</th>
+                                    <th scope="col" class="py-3">Interest Rate (%)</th>
+                                    <th scope="col" class="py-3">Interest Type</th>
+                                    <th scope="col" class="py-3">Term (Months)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="loan-types-table-body" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="4" class="text-center py-4 text-gray-500">Loading loan types...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <div id="message-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
@@ -427,6 +484,7 @@
                 if (response.ok) {
                     showModal('Success', result.status);
                     fetchApplications(); // Reload applications table
+                    fetchLoans(); // Also reload loans table to show the new loan
                 } else {
                     showModal('Error', result.detail || 'An unexpected error occurred.');
                 }
@@ -478,9 +536,13 @@
                         <td>${loan.id}</td>
                         <td>${loan.customer_name}</td>
                         <td>${formatCurrency(loan.loan_application.amount)}</td>
-                        <td class="${loan.balance === 0 ? 'text-green-600' : 'text-red-600'} capitalize">${loan.balance === 0 ? 'Paid' : 'Unpaid'}</td>
+                        <td class="${loan.balance === 0 ? 'text-green-600' : 'text-red-600'} capitalize">${loan.disbursement_date ? 'Disbursed' : loan.status}</td>
                         <td>
-                            <a href="#" onclick="showModal('View Loan', 'Viewing loan #${loan.id}')" class="text-blue-600 hover:underline">View</a>
+                            ${loan.status === 'approved' && !loan.disbursement_date ?
+                                `<button onclick="disburseLoan(${loan.id})" class="text-blue-600 hover:underline">Disburse</button>`
+                                :
+                                `<span class="text-gray-500">N/A</span>`
+                            }
                         </td>
                     </tr>
                 `).join('');
@@ -488,6 +550,31 @@
             } catch (error) {
                 console.error("Failed to fetch loans:", error);
                 loansTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
+            }
+        };
+
+        const disburseLoan = async (loanId) => {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const url = `${API_BASE_URL}/api/loans/${loanId}/disburse/`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'Authorization': `Token {{ request.user.auth_token.key }}`
+                    }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showModal('Success', result.status);
+                    fetchLoans(); // Reload the loans table
+                } else {
+                    showModal('Error', result.detail || 'An unexpected error occurred.');
+                }
+            } catch (error) {
+                console.error('Error disbursing loan:', error);
+                showModal('Error', 'Failed to disburse loan. Please try again.');
             }
         };
 
@@ -518,6 +605,31 @@
             }
         };
 
+        const fetchLoanTypes = async () => {
+            const loanTypesTableBody = document.getElementById('loan-types-table-body');
+            loanTypesTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Loading loan types...</td></tr>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/loan-types/manage/`);
+                if (!response.ok) {
+                    console.error(`Failed to fetch loan types: HTTP Status ${response.status} - ${response.statusText}`);
+                    throw new Error(`Network response was not ok. Status: ${response.status}`);
+                }
+                const loanTypes = await response.json();
+                const loanTypesHtml = loanTypes.map(loanType => `
+                    <tr class="transition-colors duration-200 hover:bg-gray-50">
+                        <td>${loanType.name}</td>
+                        <td>${loanType.interest_rate}%</td>
+                        <td>${loanType.interest_rate_type}</td>
+                        <td>${loanType.term_months} months</td>
+                    </tr>
+                `).join('');
+                loanTypesTableBody.innerHTML = loanTypesHtml || '<tr><td colspan="4" class="text-center py-4 text-gray-500">No loan types found.</td></tr>';
+            } catch (error) {
+                console.error("Failed to fetch loan types:", error);
+                loanTypesTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
+            }
+        };
+
         const showView = (viewId) => {
             document.querySelectorAll('.view-section').forEach(section => {
                 section.classList.add('hidden');
@@ -540,8 +652,53 @@
                 fetchLoans();
             } else if (viewId === 'payments') {
                 fetchPayments();
+            } else if (viewId === 'loan-types') {
+                fetchLoanTypes();
             }
         };
+
+        // Form submission handler for creating a new loan type
+        document.getElementById('create-loan-type-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const messageDiv = document.getElementById('loan-type-message');
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const payload = {
+                name: form.name.value,
+                interest_rate: form.interest_rate.value,
+                interest_rate_type: form.interest_rate_type.value,
+                term_months: form.term_months.value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/loan-types/manage/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'Authorization': `Token {{ request.user.auth_token.key }}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    messageDiv.style.display = 'block';
+                    messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-green-100 text-green-700';
+                    messageDiv.textContent = 'Loan type created successfully!';
+                    form.reset();
+                    fetchLoanTypes(); // Reload the table
+                } else {
+                    messageDiv.style.display = 'block';
+                    messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-red-100 text-red-700';
+                    messageDiv.textContent = `Error: ${JSON.stringify(result)}`;
+                }
+            } catch (error) {
+                console.error("Form submission failed:", error);
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-red-100 text-red-700';
+                messageDiv.textContent = 'Form submission failed. Please try again.';
+            }
+        });
 
         // Fetch data and show the dashboard view on load
         document.addEventListener('DOMContentLoaded', () => {

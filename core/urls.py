@@ -6,7 +6,7 @@ from .views import (
     LoanApplicationViewSet, LoanViewSet, PaymentViewSet, 
     UserRegisterView, CustomerViewSet, PaymentScheduleViewSet, register_view,
     index, login_view, dashboard_view, logout_and_redirect, AdminCreateCustomerView, add_customer_view, CustomerListView, customer_detail_view, SummaryViewSet,
-    create_loan_application_view
+    create_loan_application_view, LoanTypeManageView
 )
 
 
@@ -54,6 +54,9 @@ urlpatterns = [
 
     # URL for the loan application form page
     path('add-loan-application/', views.create_loan_application_view, name='add-loan-application'),
+
+    # URL to manage loan types
+    path('api/loan-types/manage/', LoanTypeManageView.as_view(), name='manage-loan-types'),
     
     # Include the router-generated URLs
     path('api/', include(router.urls)),

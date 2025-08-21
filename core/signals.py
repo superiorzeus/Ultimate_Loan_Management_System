@@ -2,7 +2,8 @@
 from django.db.models.signals import post_save
 # Import the LoanApplication and Loan models
 from django.dispatch import receiver
-from .models import LoanApplication, Loan
+from .models import LoanApplication, Loan, CustomerProfile
+from django.contrib.auth.models import User
 # Import the date library
 from datetime import date
 from dateutil.relativedelta import relativedelta
@@ -57,3 +58,9 @@ def set_disbursement_date(sender, instance, **kwargs):
         # to prevent an infinite loop.
         instance.save(update_fields=['disbursement_date'])
         print(f"Loan {instance.pk} disbursed on {instance.disbursement_date}")
+
+
+@receiver(post_save, sender=User)
+def create_customer_profile(sender, instance, created, **kwargs):
+    if created:
+        CustomerProfile.objects.create(user=instance)
