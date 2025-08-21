@@ -1,3 +1,5 @@
+# core/apps.py:
+
 from django.apps import AppConfig
 from django.conf import settings
 from django.db.models.signals import post_save
@@ -26,5 +28,7 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
     # the app registry is fully initialized.
     from rest_framework.authtoken.models import Token
     
+    # Only create a token if a new user instance has been created.
     if created:
-        Token.objects.get_or_create(user=instance)
+        Token.objects.create(user=instance)
+

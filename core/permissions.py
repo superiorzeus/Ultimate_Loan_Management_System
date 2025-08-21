@@ -2,11 +2,10 @@ from rest_framework import permissions
 
 # Custom permission to only allow admin users to access a view.
 class IsAdminUser(permissions.BasePermission):
+    """
+    Custom permission to only allow authenticated admin users to access a view.
+    """
     def has_permission(self, request, view):
-        # Read permissions are allowed to any user, so we'll only check for write permissions
-        # on safe methods (GET, HEAD, OPTIONS).
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        
-        # Write permissions (POST, PUT, PATCH, DELETE) are only allowed to admin users.
-        return request.user and request.user.is_authenticated and request.user.is_admin
+        # The standard Django field for admin users is `is_staff`.
+        # Your custom User model inherits from AbstractBaseUser, which includes this field.
+        return bool(request.user and request.user.is_authenticated and request.user.is_staff)

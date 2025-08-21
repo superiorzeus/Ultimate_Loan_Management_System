@@ -121,7 +121,8 @@ class Loan(models.Model):
 
 # A new model to store the payment schedule for a loan.
 class PaymentSchedule(models.Model):
-    loan_application = models.ForeignKey(LoanApplication, on_delete=models.CASCADE, related_name='payment_schedule')
+    # This foreign key links the schedule to a specific, approved loan.
+    loan = models.ForeignKey(Loan, on_delete=models.CASCADE, related_name='payment_schedule')
     due_date = models.DateField()
     due_amount = models.DecimalField(max_digits=10, decimal_places=2)
     principal_due = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
@@ -131,7 +132,7 @@ class PaymentSchedule(models.Model):
     is_overdue = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Payment due on {self.due_date} for loan application {self.loan_application.id}"
+        return f"Payment due on {self.due_date} for loan {self.loan.pk}"
 
 
 # Payment Model
@@ -146,4 +147,4 @@ class Payment(models.Model):
     transaction_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     def __str__(self):
-        return f"Payment of GHS{self.amount_paid} for loan {self.payment_schedule.loan_application.id}"
+        return f"Payment of GHS{self.amount_paid} for loan {self.payment_schedule.loan.pk}"

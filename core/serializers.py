@@ -2,6 +2,24 @@ from rest_framework import serializers
 from .models import User, CustomerProfile, LoanApplication, Loan, Payment, LoanType, PaymentSchedule
 from django.db import transaction
 
+# A serializer for the User model specifically for registration.
+class UserRegisterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username', 'phone_number', 'name', 'password']
+        extra_kwargs = {'password': {'write_only': True}}
+    
+    @transaction.atomic
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            phone_number=validated_data['phone_number'],
+            name=validated_data['name'],
+            password=validated_data['password']
+        )
+        return user
+
+
 # A serializer for the LoanType model.
 class LoanTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -28,6 +46,16 @@ class PaymentScheduleSerializer(serializers.ModelSerializer):
         fields = ['id', 'due_date', 'due_amount', 'is_paid', 'payments']
         read_only_fields = ['is_paid']
 
+# A new serializer for recording a payment.
+# This serializer is used specifically for the PaymentViewSet's create action
+# to accept 'payment_schedule' and 'amount_paid' fields.
+class LoanPaymentSerializer(serializers.ModelSerializer):
+    payment_schedule = serializers.PrimaryKeyRelatedField(queryset=PaymentSchedule.objects.all())
+    
+    class Meta:
+        model = Payment
+        fields = ['payment_schedule', 'amount_paid']
+        
 # A serializer for the Loan model. It now includes the PaymentSchedule.
 class LoanSerializer(serializers.ModelSerializer):
     # This will display the full payment schedule for the loan.
@@ -56,6 +84,11 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'loan_type', 'amount', 'status', 'created_at', 'loan']
         read_only_fields = ['user', 'status', 'created_at']
 
+# A serializer for approving a loan application.
+class LoanApplicationApproveSerializer(serializers.Serializer):
+    interest_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
+    term_months = serializers.IntegerField()
+
 
 # A serializer for creating and updating the User model.
 class UserSerializer(serializers.ModelSerializer):
@@ -74,6 +107,13 @@ class UserSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         return user
+
+
+# A simple serializer for the CustomerProfile model.
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerProfile
+        fields = '__all__'
 
 
 # A serializer for the CustomerProfile model.

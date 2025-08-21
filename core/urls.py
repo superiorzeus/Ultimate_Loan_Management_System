@@ -1,10 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from . import views
 from .views import (
     UserViewSet, CustomerProfileViewSet, LoanTypeViewSet,
-    LoanApplicationViewSet, LoanViewSet, PaymentViewSet,
-    LoginView, # We need to import the new LoginView here
-    index
+    LoanApplicationViewSet, LoanViewSet, PaymentViewSet, 
+    UserRegisterView, CustomerViewSet, PaymentScheduleViewSet,
+    index, login_view, dashboard_view, logout_and_redirect
 )
 
 
@@ -16,15 +17,24 @@ router.register(r'loan-types', LoanTypeViewSet)
 router.register(r'loan-applications', LoanApplicationViewSet)
 router.register(r'loans', LoanViewSet)
 router.register(r'payments', PaymentViewSet, basename='payments')
+router.register(r'customers', CustomerViewSet, basename='customers')
+router.register(r'payment-schedules', PaymentScheduleViewSet)
 
-# The API URLs are now determined automatically by the router.
+
 urlpatterns = [
-    # The login URL is not part of a ViewSet, so we add it manually.
-    # We'll place it under the 'api/' prefix to keep things organized.
-    path('api/login/', LoginView.as_view(), name='login'),
-
-    # The API endpoints are now nested under the 'api/' prefix
-    path('api/', include(router.urls)),
-    # This is the new URL pattern that serves the index.html template
+    # Custom URL for the main index page
     path('', index, name='index'),
+    # Custom URL for user registration
+    path('register/', UserRegisterView.as_view(), name='register'),
+    # Custom URL for the login view
+    path('login/', login_view, name='login'),
+    # Custom URL for the dashboard page
+    path('dashboard/', dashboard_view, name='dashboard'),
+    # Custom URL for the logout view
+    path('logout/', views.logout_and_redirect, name='logout'),
+    # path('logout/', logout_view, name='logout'),
+    
+    # Include the router-generated URLs
+    path('api/', include(router.urls)),
 ]
+
