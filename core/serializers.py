@@ -92,18 +92,18 @@ class LoanPaymentSerializer(serializers.ModelSerializer):
         
 # A serializer for the Loan model. It now includes the PaymentSchedule.
 class LoanSerializer(serializers.ModelSerializer):
-    # This will display the full payment schedule for the loan.
-    payment_schedule = PaymentScheduleSerializer(many=True, read_only=True)
-    loan_type = serializers.CharField(source='application.loan_type.name')
-    term_months = serializers.IntegerField(source='application.loan_type.term_months')
-    
+    # This read-only field gets the user's name from the related User model
+    customer_name = serializers.CharField(source='application.user.name', read_only=True)
+    loan_type_name = serializers.CharField(source='application.loan_type.name', read_only=True)
+
     class Meta:
         model = Loan
         fields = [
-            'id', 'amount', 'interest_rate', 'term_months', 'balance', 
-            'disbursed', 'disbursement_date', 'start_date', 'end_date',
-            'loan_type', 'payment_schedule' # Renamed from 'payments' to 'payment_schedule'
+            'application', 'customer_name', 'loan_type_name',
+            'amount', 'interest_rate', 'term_months', 'balance',
+            'start_date', 'end_date', 'disbursed', 'disbursement_date'
         ]
+        read_only_fields = ['application', 'amount', 'interest_rate', 'term_months', 'balance', 'start_date', 'end_date', 'disbursed', 'disbursement_date']
 
 
 # A serializer for the LoanApplication model.

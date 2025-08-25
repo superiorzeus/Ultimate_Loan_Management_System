@@ -12,6 +12,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 from django.contrib import messages
 
 # Django Rest Framework imports
@@ -201,47 +202,21 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
 class LoanApplicationViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing loan applications.
-    Admins can create, view, and manage all loan applications.
-    Customers can only create and view their own applications.
     """
     queryset = LoanApplication.objects.all()
     serializer_class = LoanApplicationSerializer
-    
-    permission_classes = [IsAdminUser]
 
-    def get_queryset(self):
-        """
-        Filters the loan application queryset based on the user's role.
-        """
-        if self.request.user.is_staff:
-            return LoanApplication.objects.all()
-        return LoanApplication.objects.filter(user=self.request.user)
-
-    @transaction.atomic
-    def perform_create(self, serializer):
-        """
-        Custom create method that only saves the loan application.
-        The Loan and PaymentSchedule are created later upon approval/disbursement.
-        """
-        loan_application = serializer.save()
-
-    # --- START OF NEW CODE: Custom actions for admin users ---
-    @action(detail=True, methods=['post'], url_path='approve')
+    @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         """
-        Custom action to approve a pending loan application.
+        Custom action to approve a loan application.
         """
         loan_application = self.get_object()
-
-        if loan_application.status != 'pending':
-            return Response({'detail': 'This application cannot be approved.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        loan_application.status = 'approved'
-        loan_application.approved_by = request.user
-        loan_application.date_approved = timezone.now()
-        loan_application.save()
-
-        return Response({'detail': 'Loan application approved successfully.'})
+        if loan_application.status == 'pending':
+            loan_application.status = 'approved'
+            loan_application.save()
+            return Response({'status': 'Application approved successfully.'})
+        return Response({'status': 'Application cannot be approved.'}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'], url_path='disburse')
     def disburse(self, request, pk=None):
@@ -253,10 +228,54 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
         if loan_application.status != 'approved':
             return Response({'detail': 'This application is not approved and cannot be disbursed.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Move the Loan creation logic here, and add the PaymentSchedule creation
-        # I will provide the detailed code for this step after the next one.
-        return Response({'detail': 'Disbursement logic to be implemented.'})
-    # --- END OF NEW CODE ---
+        try:
+            with transaction.atomic():
+                # Find the existing Loan object
+                loan = get_object_or_404(Loan, application=loan_application)
+
+                # Update the Loan status
+                loan.disbursed = True
+                loan.disbursement_date = timezone.now().date()
+                loan.save()
+
+                # Update the application status to disbursed
+                loan_application.status = 'disbursed'
+                loan_application.date_disbursed = timezone.now()
+                loan_application.save()
+                
+                # Payment schedule creation logic (remains the same)
+                principal = loan_application.amount
+                interest_rate = loan_application.loan_type.interest_rate
+                term_months = loan_application.loan_type.term_months
+                interest_rate_type = loan_application.loan_type.interest_rate_type
+                
+                # Calculate total payable amount based on interest rate type
+                if interest_rate_type in ['flat', 'flat_rate']:
+                    total_interest = (principal * interest_rate) / 100
+                    total_payable = principal + total_interest
+                elif interest_rate_type in ['monthly', 'monthly_rate', 'yearly', 'yearly_rate']:
+                    total_interest = (principal * (interest_rate / 100) * (term_months / 12))
+                    total_payable = principal + total_interest
+                else:
+                    return Response({'detail': f'Unsupported interest rate type: {interest_rate_type}'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                monthly_payment = total_payable / term_months
+                current_date = timezone.now().date()
+                for month in range(term_months):
+                    current_date += relativedelta(months=1)
+                    PaymentSchedule.objects.create(
+                        loan=loan,
+                        due_date=current_date,
+                        due_amount=monthly_payment,
+                        principal_due=monthly_payment,
+                        interest_due=0,
+                        is_paid=False
+                    )
+        
+        except Exception as e:
+            return Response({'detail': f'An unexpected error occurred: {e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({'detail': 'Loan disbursed and payment schedule created successfully.'})
 
 
 # A ViewSet for managing loans.
@@ -725,3 +744,11 @@ def create_loan_application_view(request):
         'customers': customers
     }
     return render(request, 'loan_application_form.html', context)
+
+
+# Loan detail view
+@login_required
+def loan_detail_view(request, pk):
+    loan = get_object_or_404(Loan, application__pk=pk)
+    context = {'loan': loan}
+    return render(request, 'loan_detail.html', context)

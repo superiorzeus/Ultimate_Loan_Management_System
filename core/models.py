@@ -147,6 +147,15 @@ class PaymentSchedule(models.Model):
     def __str__(self):
         return f"Payment due on {self.due_date} for loan {self.loan.pk}"
 
+    @property
+    def is_overdue_check(self):
+        """
+        A property to check if the payment is overdue in real-time.
+        """
+        from django.utils import timezone
+        # A payment is overdue if its due date is in the past AND it has not been paid.
+        return self.due_date < timezone.now().date() and not self.is_paid
+
 
 # Payment Model
 # This model stores all the payments made towards a specific loan.

@@ -367,7 +367,7 @@
                         <tr class="transition-colors duration-200 hover:bg-gray-50">
                             <td>${payment.id}</td>
                             <td>${formatCurrency(payment.amount_paid)}</td>
-                            <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
+                            <td>${app.date_created ? new Date(app.date_created).toISOString().slice(0, 10) : 'N/A'}</td>
                             <td>${payment.recorded_by_name || 'N/A'}</td>
                         </tr>
                     `).join('');
@@ -381,23 +381,30 @@
                 const applications = await applicationsResponse.json();
                 const dashboardApplicationsTableBody = document.getElementById('dashboard-applications-table-body');
                 if (applications.length > 0) {
-                    const applicationsHtml = applications.slice(0, 5).map(app => `
-                        <tr class="transition-colors duration-200 hover:bg-gray-50">
-                            <td>${app.id}</td>
-                            <td>${app.user_name}</td>
-                            <td>${formatCurrency(app.amount)}</td>
-                            <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
-                            <td>${new Date(app.date_created).toLocaleDateString()}</td>
-                        </tr>
-                    `).join('');
+                    const applicationsHtml = applications.slice(0, 5).map(app => {
+                        let actionButton = '';
+                        if (app.status === 'approved') {
+                            actionButton = `<button onclick="disburseLoan(${app.id})" class="disburse-btn px-3 py-1 text-sm font-semibold text-white bg-green-500 rounded-md hover:bg-green-600 transition-colors duration-200">Disburse</button>`;
+                        }
+                        return `
+                            <tr class="transition-colors duration-200 hover:bg-gray-50">
+                                <td>${app.id}</td>
+                                <td>${app.user_name}</td>
+                                <td>${formatCurrency(app.amount)}</td>
+                                <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
+                                <td>${app.date_created ? new Date(app.date_created).toISOString().slice(0, 10) : 'N/A'}</td>
+                                <td>${actionButton}</td>
+                            </tr>
+                        `;
+                    }).join('');
                     dashboardApplicationsTableBody.innerHTML = applicationsHtml;
                 } else {
-                    dashboardApplicationsTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No recent applications found.</td></tr>';
+                    dashboardApplicationsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No recent applications found.</td></tr>';
                 }
             } catch (error) {
                 console.error("Failed to fetch dashboard data:", error);
                 document.getElementById('dashboard-payments-table-body').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
-                document.getElementById('dashboard-applications-table-body').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
+                document.getElementById('dashboard-applications-table-body').innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Failed to load data.</td></tr>';
             }
         };
 
@@ -449,7 +456,7 @@
                         <td>${app.user_name}</td>
                         <td>${formatCurrency(app.amount)}</td>
                         <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
-                        <td>${new Date(app.date_created).toLocaleDateString()}</td>
+                        <td>${app.date_created ? new Date(app.date_created).toISOString().slice(0, 10) : 'N/A'}</td>
                         <td>
                             ${app.status === 'pending' ?
                                 `<button onclick="approveApplication(${app.id})" class="text-green-600 hover:underline mr-2">Approve</button>
@@ -519,6 +526,33 @@
                 showModal('Error', 'Failed to reject application. Please try again.');
             }
         };
+
+        // New function to handle loan disbursement
+        const disburseLoan = async (applicationId) => {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const url = `${API_BASE_URL}/api/loan-applications/${applicationId}/disburse/`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'Authorization': `Token {{ request.user.auth_token.key }}`
+                    }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showModal('Success', result.detail);
+                    fetchApplications(); // Reload applications table
+                    fetchLoans(); // Also reload the loans table
+                } else {
+                    showModal('Error', result.detail || 'An unexpected error occurred.');
+                }
+            } catch (error) {
+                console.error("Error disbursing loan:", error);
+                showModal('Error', 'Failed to disburse loan. Please try again.');
+            }
+        };
         
         const fetchLoans = async () => {
             const loansTableBody = document.getElementById('loans-table-body');
@@ -533,16 +567,12 @@
                 
                 const loansHtml = loans.map(loan => `
                     <tr class="transition-colors duration-200 hover:bg-gray-50">
-                        <td>${loan.id}</td>
+                        <td>${loan.application}</td>
                         <td>${loan.customer_name}</td>
-                        <td>${formatCurrency(loan.loan_application.amount)}</td>
-                        <td class="${loan.balance === 0 ? 'text-green-600' : 'text-red-600'} capitalize">${loan.disbursement_date ? 'Disbursed' : loan.status}</td>
+                        <td>${formatCurrency(loan.amount)}</td>
+                        <td>${loan.disbursed ? 'Disbursed' : 'Approved'}</td>
                         <td>
-                            ${loan.status === 'approved' && !loan.disbursement_date ?
-                                `<button onclick="disburseLoan(${loan.id})" class="text-blue-600 hover:underline">Disburse</button>`
-                                :
-                                `<span class="text-gray-500">N/A</span>`
-                            }
+                            <a href="/loans/${loan.application}/" class="text-blue-600 hover:underline">View</a>
                         </td>
                     </tr>
                 `).join('');
@@ -553,30 +583,6 @@
             }
         };
 
-        const disburseLoan = async (loanId) => {
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            const url = `${API_BASE_URL}/api/loans/${loanId}/disburse/`;
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken,
-                        'Authorization': `Token {{ request.user.auth_token.key }}`
-                    }
-                });
-                const result = await response.json();
-                if (response.ok) {
-                    showModal('Success', result.status);
-                    fetchLoans(); // Reload the loans table
-                } else {
-                    showModal('Error', result.detail || 'An unexpected error occurred.');
-                }
-            } catch (error) {
-                console.error('Error disbursing loan:', error);
-                showModal('Error', 'Failed to disburse loan. Please try again.');
-            }
-        };
 
         const fetchPayments = async () => {
             const paymentsTableBody = document.getElementById('payments-table-body');
@@ -594,7 +600,7 @@
                         <td>${payment.id}</td>
                         <td>${payment.loan.id}</td>
                         <td>${formatCurrency(payment.amount_paid)}</td>
-                        <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
+                       <td>${app.date_created ? new Date(app.date_created).toISOString().slice(0, 10) : 'N/A'}</td>
                         <td>${payment.recorded_by_name || 'N/A'}</td>
                     </tr>
                 `).join('');
