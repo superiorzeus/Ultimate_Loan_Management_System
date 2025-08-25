@@ -52,6 +52,9 @@ urlpatterns = [
     # URL to show the detail page for a specific customer
     path('customers/<str:username>/', views.customer_detail_view, name='customer-detail'),
 
+    # New URL to handle the update action for customer status
+    path('customers/<str:username>/update-status/', views.customer_detail_view, name='customer_update_status'),
+
     # URL for the loan application form page
     path('add-loan-application/', views.create_loan_application_view, name='add-loan-application'),
 

@@ -10,6 +10,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from datetime import timedelta
+from django.contrib import messages
 
 # Django Rest Framework imports
 from rest_framework import viewsets, status, permissions, mixins
@@ -583,6 +584,26 @@ def customer_detail_view(request, username):
     """
     # Use get_object_or_404 to handle cases where the username does not exist
     customer_user = get_object_or_404(User, username=username)
+
+    # --- START OF ADDED CODE ---
+    # Handle POST request for updating customer status
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'approve':
+            customer_user.is_customer_approved = True
+            messages.success(request, f'Customer {customer_user.name} has been approved successfully.')
+        elif action == 'activate':
+            customer_user.is_active = True
+            messages.success(request, f'Account for {customer_user.name} has been activated.')
+        elif action == 'deactivate':
+            customer_user.is_active = False
+            messages.warning(request, f'Account for {customer_user.name} has been deactivated.')
+        customer_user.save()
+        # --- START OF CORRECTED LINE ---
+        # Redirect back to the same page with the updated status using the correct URL name
+        return redirect('customer-detail', username=customer_user.username)
+        # --- END OF CORRECTED LINE ---
+    # --- END OF ADDED CODE ---
 
     # Get related data
     try:

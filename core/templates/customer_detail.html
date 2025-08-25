@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Details</title>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -40,7 +38,6 @@
     </style>
 </head>
 <body class="p-6 md:p-12">
-    <!-- Header Section -->
     <div class="container mx-auto">
         <div class="flex items-center justify-between mb-8">
             <h1 class="text-4xl font-bold text-gray-900">
@@ -52,9 +49,7 @@
         </div>
     </div>
 
-    <!-- Main Content -->
     <div class="container mx-auto mt-8 space-y-8">
-        <!-- Customer Profile Section -->
         <div class="card p-8">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6">User Information</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -88,10 +83,55 @@
                     <p class="text-lg font-semibold text-gray-900">{{ customer_profile.digital_address }}</p>
                 </div>
                 {% endif %}
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Approval Status</p>
+                    <p class="text-lg font-semibold {% if customer_user.is_customer_approved %}text-green-600{% else %}text-red-600{% endif %}">
+                        {{ customer_user.is_customer_approved|yesno:"Approved,Not Approved" }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Account Status</p>
+                    <p class="text-lg font-semibold {% if customer_user.is_active %}text-green-600{% else %}text-red-600{% endif %}">
+                        {{ customer_user.is_active|yesno:"Active,Inactive" }}
+                    </p>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-6 border-t border-gray-200 flex space-x-4">
+                {% if not customer_user.is_customer_approved %}
+                <form action="{% url 'customer_update_status' username=customer_user.username %}" method="post" class="inline-block">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="approve">
+                    <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                        Approve Customer
+                    </button>
+                </form>
+                {% else %}
+                <div class="flex items-center space-x-4">
+                    <span class="text-green-600 font-medium">Customer is Approved</span>
+                </div>
+                {% endif %}
+
+                {% if customer_user.is_active %}
+                <form action="{% url 'customer_update_status' username=customer_user.username %}" method="post" class="inline-block">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="deactivate">
+                    <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
+                        Deactivate Account
+                    </button>
+                </form>
+                {% else %}
+                <form action="{% url 'customer_update_status' username=customer_user.username %}" method="post" class="inline-block">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="activate">
+                    <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                        Activate Account
+                    </button>
+                </form>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Loan Applications Section -->
         <div class="card p-8">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6">Loan Applications</h2>
             {% if loan_applications %}
@@ -122,7 +162,6 @@
             {% endif %}
         </div>
 
-        <!-- Loans Section -->
         <div class="card p-8">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6">Active Loans</h2>
             {% if loans %}
@@ -155,7 +194,6 @@
             {% endif %}
         </div>
         
-        <!-- Payments Section -->
         <div class="card p-8">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6">Payment History</h2>
             {% if payments %}
