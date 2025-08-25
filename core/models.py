@@ -105,6 +105,7 @@ class LoanApplication(models.Model):
     # A foreign key to the type of loan being applied for
     loan_type = models.ForeignKey(LoanType, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    purpose = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     date_approved = models.DateTimeField(null=True, blank=True)

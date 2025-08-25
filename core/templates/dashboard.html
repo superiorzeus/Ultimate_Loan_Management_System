@@ -384,7 +384,7 @@
                     const applicationsHtml = applications.slice(0, 5).map(app => `
                         <tr class="transition-colors duration-200 hover:bg-gray-50">
                             <td>${app.id}</td>
-                            <td>${app.customer_name}</td>
+                            <td>${app.user_name}</td>
                             <td>${formatCurrency(app.amount)}</td>
                             <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
                             <td>${new Date(app.date_created).toLocaleDateString()}</td>
@@ -446,7 +446,7 @@
                 const applicationsHtml = applications.map(app => `
                     <tr class="transition-colors duration-200 hover:bg-gray-50">
                         <td>${app.id}</td>
-                        <td>${app.customer_name}</td>
+                        <td>${app.user_name}</td>
                         <td>${formatCurrency(app.amount)}</td>
                         <td class="${app.status === 'approved' ? 'text-green-600' : app.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'} capitalize">${app.status}</td>
                         <td>${new Date(app.date_created).toLocaleDateString()}</td>

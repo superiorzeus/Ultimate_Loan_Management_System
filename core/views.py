@@ -1,3 +1,5 @@
+# core/views.py
+
 # Django imports
 import requests
 import json
@@ -204,45 +206,57 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
     """
     queryset = LoanApplication.objects.all()
     serializer_class = LoanApplicationSerializer
-    permission_classes = [IsAuthenticated]
+    
+    permission_classes = [IsAdminUser]
 
     def get_queryset(self):
         """
         Filters the loan application queryset based on the user's role.
         """
-        # Admins can view all loan applications.
         if self.request.user.is_staff:
             return LoanApplication.objects.all()
-        # Customers can only view their own loan applications.
         return LoanApplication.objects.filter(user=self.request.user)
 
     @transaction.atomic
     def perform_create(self, serializer):
         """
-        Custom create method that sets the user on the loan application.
-        The user is automatically set for regular customers, but an admin
-        can specify a different user.
+        Custom create method that only saves the loan application.
+        The Loan and PaymentSchedule are created later upon approval/disbursement.
         """
-        # Check if the authenticated user is an admin.
-        if self.request.user.is_staff:
-            # If the admin has provided a user in the request data, use it.
-            # Otherwise, raise an error. The serializer will handle validation.
-            # We don't need to do anything here as the serializer handles the 'user' field directly.
-            loan_application = serializer.save()
-        else:
-            # If the user is not an admin, automatically link the application to them.
-            loan_application = serializer.save(user=self.request.user)
-            
-        # Create a Loan object with a 'pending' status after the application is saved.
-        # This part of the code is now more robust.
-        Loan.objects.create(
-            application=loan_application,
-            amount=loan_application.amount,
-            interest_rate=loan_application.loan_type.interest_rate,
-            term_months=loan_application.loan_type.term_months,
-            balance=loan_application.amount, # Initial balance is just the amount
-            start_date=timezone.now().date(),
-        )
+        loan_application = serializer.save()
+
+    # --- START OF NEW CODE: Custom actions for admin users ---
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve(self, request, pk=None):
+        """
+        Custom action to approve a pending loan application.
+        """
+        loan_application = self.get_object()
+
+        if loan_application.status != 'pending':
+            return Response({'detail': 'This application cannot be approved.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        loan_application.status = 'approved'
+        loan_application.approved_by = request.user
+        loan_application.date_approved = timezone.now()
+        loan_application.save()
+
+        return Response({'detail': 'Loan application approved successfully.'})
+
+    @action(detail=True, methods=['post'], url_path='disburse')
+    def disburse(self, request, pk=None):
+        """
+        Custom action to disburse an approved loan and create the payment schedule.
+        """
+        loan_application = self.get_object()
+
+        if loan_application.status != 'approved':
+            return Response({'detail': 'This application is not approved and cannot be disbursed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Move the Loan creation logic here, and add the PaymentSchedule creation
+        # I will provide the detailed code for this step after the next one.
+        return Response({'detail': 'Disbursement logic to be implemented.'})
+    # --- END OF NEW CODE ---
 
 
 # A ViewSet for managing loans.
@@ -651,9 +665,63 @@ class SummaryViewSet(viewsets.GenericViewSet, mixins.ListModelMixin):
 @login_required
 def create_loan_application_view(request):
     """
-    Renders the form for creating a new loan application.
+    Renders the form for creating a new loan application and handles form submission.
     """
+    customers = User.objects.filter(customer_profile__isnull=False, is_active=True).order_by('username')
+    
+    if request.method == 'POST':
+        api_data = {
+            'user': request.POST.get('user'),
+            'loan_type': request.POST.get('loan_type'),
+            'amount': request.POST.get('amount')
+        }
+        
+        api_url = 'http://127.0.0.1:8000/api/loan-applications/'
+        
+        # --- START OF UPDATED CODE ---
+        try:
+            user_token = Token.objects.get(user=request.user)
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Token {user_token.key}'
+            }
+        except Token.DoesNotExist:
+            messages.error(request, 'Authentication token not found. Please log in again.')
+            return redirect('login')
+        
+        response = requests.post(api_url, data=json.dumps(api_data), headers=headers)
+
+        if response.status_code == 201:
+            messages.success(request, 'Loan application submitted successfully!')
+            return redirect('dashboard')
+        else:
+            # Handle API errors more gracefully
+            try:
+                errors = response.json()
+            except json.JSONDecodeError:
+                # Fallback for non-JSON responses
+                errors = {'detail': [f'API Error: {response.text}']}
+            
+            # This is where we ensure the errors variable is a dictionary with a list value.
+            # Example: {"detail": ["Authentication credentials were not provided."]}
+            # If the API returns a simple string, we wrap it in a dictionary and a list.
+            if isinstance(errors.get('detail'), str):
+                 errors['detail'] = [errors['detail']]
+
+            loan_types = LoanType.objects.all()
+            context = {
+                'user': request.user,
+                'errors': errors,
+                'loan_types': loan_types,
+                'customers': customers
+            }
+            messages.error(request, 'There was an error submitting your application. Please check the form.')
+            return render(request, 'loan_application_form.html', context)
+    
+    loan_types = LoanType.objects.all()
     context = {
-        'user': request.user
+        'user': request.user,
+        'loan_types': loan_types,
+        'customers': customers
     }
     return render(request, 'loan_application_form.html', context)
