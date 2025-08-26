@@ -148,10 +148,14 @@
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for app in loan_applications %}
                         <tr class="transition-colors duration-200 hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap">{{ app.amount_requested }}</td>
+                            <!-- <td class="px-6 py-4 whitespace-nowrap">{{ app.amount_requested }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ app.loan_purpose }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ app.status }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ app.submission_date|date:"Y-m-d" }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.submission_date|date:"Y-m-d" }}</td> -->
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.amount }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.purpose }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.status }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.created_at|date:"d-m-Y" }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -183,7 +187,7 @@
                             <td class="px-6 py-4 whitespace-nowrap">{{ loan.amount }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ loan.balance }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ loan.status }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.disbursement_date|date:"Y-m-d" }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.disbursement_date|date:"d-m-Y" }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Loan Application Details</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary {
+            background-color: #2563eb;
+            color: #ffffff;
+            font-weight: 600;
+            padding: 12px 16px;
+            border-radius: 8px;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+        }
+        .btn-green {
+            background-color: #10b981;
+            color: #ffffff;
+        }
+        .btn-green:hover {
+            background-color: #059669;
+        }
+        .btn-red {
+            background-color: #ef4444;
+            color: #ffffff;
+        }
+        .btn-red:hover {
+            background-color: #dc2626;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+    <div class="container mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">Loan Application Details</h1>
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            <a href="{% url 'dashboard' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                &larr; Back to Dashboard
+            </a>
+        </div>
+        
+        <div id="application-details" class="card p-8 space-y-6">
+            <p class="text-center text-gray-500 py-8">Loading application details...</p>
+        </div>
+    </div>
+
+    <div id="message-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" aria-hidden="true"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block px-4 pt-5 pb-4 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-sm sm:w-full sm:p-6">
+                <div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 class="text-lg font-medium leading-6 text-gray-900" id="modal-title"></h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500" id="modal-message"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="closeModal()">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin;
+
+        const showModal = (title, message) => {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            document.getElementById('message-modal').classList.remove('hidden');
+        };
+
+        const closeModal = () => {
+            document.getElementById('message-modal').classList.add('hidden');
+        };
+
+        const formatCurrency = (amount) => {
+            return new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS' }).format(amount);
+        };
+
+        const fetchApplicationDetails = async () => {
+            const pathSegments = window.location.pathname.split('/');
+            const applicationId = pathSegments[pathSegments.length - 2];
+            const detailsContainer = document.getElementById('application-details');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/loan-applications/${applicationId}/`);
+                // const response = await fetch(`${API_BASE_URL}/api-loan-applications/${applicationId}/`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch application details: HTTP status ${response.status}`);
+                }
+                const application = await response.json();
+
+                // Generate the HTML with JavaScript
+                const detailsHtml = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Application ID</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900">${application.id}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Customer</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900">${application.user_name}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Loan Type</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900">${application.loan_type_name}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Amount</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900">${formatCurrency(application.amount)}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Status</p>
+                            <p class="mt-1 text-lg font-semibold capitalize ${application.status === 'approved' ? 'text-green-600' : application.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'}">${application.status}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Date Applied</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900">${application.created_at ? new Date(application.created_at).toISOString().slice(0, 10) : 'N/A'}</p>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-6">
+                        <p class="text-sm font-medium text-gray-500">Loan Purpose</p>
+                        <p class="mt-1 text-lg text-gray-900">${application.purpose || 'N/A'}</p>
+                    </div>
+
+                    <div class="pt-6">
+                        ${application.status === 'pending' ? `
+                            <button onclick="approveApplication(${application.id})" class="btn-green inline-flex items-center px-4 py-2 mr-2 font-medium rounded-md shadow-sm">
+                                Approve
+                            </button>
+                            <button onclick="rejectApplication(${application.id})" class="btn-red inline-flex items-center px-4 py-2 font-medium rounded-md shadow-sm">
+                                Reject
+                            </button>
+                        ` : application.status === 'approved' ? `
+                            <p class="text-sm text-gray-500">Loan has been approved. A new loan object has been created. Check the Loans tab on the dashboard.</p>
+                            <a href="/loans/${application.id}/" class="btn-primary inline-flex items-center px-4 py-2 mt-4 font-medium rounded-md shadow-sm">
+                                View Loan Details
+                            </a>
+                        ` : `
+                            <p class="text-sm text-gray-500">No actions available for this status.</p>
+                        `}
+                    </div>
+                `;
+                detailsContainer.innerHTML = detailsHtml;
+
+            } catch (error) {
+                console.error("Failed to fetch application details:", error);
+                detailsContainer.innerHTML = `<p class="text-center text-red-500 py-8">Failed to load application details. Please check the Application ID and try again.</p>`;
+            }
+        };
+
+        const approveApplication = async (applicationId) => {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const url = `${API_BASE_URL}/api/loan-applications/${applicationId}/approve/`;
+            // const url = `${API_BASE_URL}/api-loan-applications/${applicationId}/approve/`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                    }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showModal('Success', result.status);
+                    fetchApplicationDetails(); // Refresh the details to show the new status
+                } else {
+                    showModal('Error', result.status || 'An unexpected error occurred.');
+                }
+            } catch (error) {
+                console.error('Error approving application:', error);
+                showModal('Error', 'Failed to approve application. Please try again.');
+            }
+        };
+
+        const rejectApplication = async (applicationId) => {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const url = `${API_BASE_URL}/api/loan-applications/${applicationId}/reject/`;
+            // const url = `${API_BASE_URL}/api-loan-applications/${applicationId}/reject/`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                    }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showModal('Success', result.status);
+                    fetchApplicationDetails(); // Refresh the details to show the new status
+                } else {
+                    showModal('Error', result.status || 'An unexpected error occurred.');
+                }
+            } catch (error) {
+                console.error('Error rejecting application:', error);
+                showModal('Error', 'Failed to reject application. Please try again.');
+            }
+        };
+
+        const disburseLoan = async (applicationId) => {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const url = `${API_BASE_URL}/api/loan-applications/${applicationId}/disburse/`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                    }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showModal('Success', result.detail);
+                    fetchApplicationDetails(); // Refresh the details to show the new status
+                } else {
+                    showModal('Error', result.detail || 'An unexpected error occurred.');
+                }
+            } catch (error) {
+                console.error("Error disbursing loan:", error);
+                showModal('Error', 'Failed to disburse loan. Please try again.');
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchApplicationDetails();
+        });
+    </script>
+</body>
+</html>

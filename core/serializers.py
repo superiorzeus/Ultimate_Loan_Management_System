@@ -107,15 +107,16 @@ class LoanSerializer(serializers.ModelSerializer):
 
 
 # A serializer for the LoanApplication model.
-# A serializer for the LoanApplication model.
 class LoanApplicationSerializer(serializers.ModelSerializer):
     # This read-only field gets the user's name from the related User model
     user_name = serializers.CharField(source='user.name', read_only=True)
+    # This read-only field gets the loan type name from the related LoanType model
+    loan_type_name = serializers.CharField(source='loan_type.name', read_only=True)
 
     class Meta:
         model = LoanApplication
-        fields = ['id', 'user', 'user_name', 'loan_type', 'amount', 'purpose', 'status']
-        read_only_fields = ['status', 'user_name']
+        fields = ['id', 'user', 'user_name', 'loan_type', 'loan_type_name', 'amount', 'purpose', 'status', 'created_at']
+        read_only_fields = ['status', 'user_name', 'loan_type_name', 'created_at']
 
 # A serializer for approving a loan application.
 class LoanApplicationApproveSerializer(serializers.Serializer):

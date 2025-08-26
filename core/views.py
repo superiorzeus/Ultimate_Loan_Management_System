@@ -3,6 +3,7 @@
 # Django imports
 import requests
 import json
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db import transaction
 from django.db.models import Q, F
@@ -205,6 +206,13 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
     """
     queryset = LoanApplication.objects.all()
     serializer_class = LoanApplicationSerializer
+
+    # Add this custom action to create a unique URL for the list view.
+    @action(detail=False, methods=['get'], url_path='list-applications')
+    def list_applications(self, request):
+        applications = self.get_queryset()
+        serializer = self.get_serializer(applications, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
@@ -752,3 +760,26 @@ def loan_detail_view(request, pk):
     loan = get_object_or_404(Loan, application__pk=pk)
     context = {'loan': loan}
     return render(request, 'loan_detail.html', context)
+
+# Loan application detail view
+# @login_required
+# def loan_application_detail_view(request, pk):
+#     """
+#     Renders the loan application detail page.
+#     The details are fetched by the frontend JavaScript.
+#     """
+#     return render(request, 'loan_application_detail.html', {'user': request.user})
+@login_required
+def loan_application_detail_view(request, pk):
+    """
+    Renders the loan application detail page or serves JSON for API calls.
+    """
+    loan_application = get_object_or_404(LoanApplication, pk=pk)
+
+    # Check if the request is for JSON data (an API call)
+    if request.headers.get('accept') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        serializer = LoanApplicationSerializer(loan_application)
+        return JsonResponse(serializer.data, safe=False)
+
+    # Otherwise, render the HTML page as normal
+    return render(request, 'loan_application_detail.html', {'user': request.user})
