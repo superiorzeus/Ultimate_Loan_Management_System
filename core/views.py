@@ -393,6 +393,49 @@ class LoanViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# # A ViewSet for managing payment-related operations.
+# class PaymentViewSet(viewsets.ModelViewSet):
+#     """
+#     ViewSet for managing payments.
+#     Admins can create and view all payments.
+#     Customers can only view payments related to their loans.
+#     """
+#     queryset = Payment.objects.all()
+#     serializer_class = PaymentSerializer
+#     # This permission ensures only authenticated users can access this viewset.
+#     # The actual access control is handled in get_queryset().
+#     permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         """
+#         Filters the payments queryset based on the user's role.
+#         """
+#         # Admins can view all payments.
+#         if self.request.user.is_staff:
+#             return Payment.objects.all()
+#         # Customers can only view payments related to their loans.
+#         # This filter correctly links payments to the user's loan applications.
+#         return Payment.objects.filter(payment_schedule__loan__application__user=self.request.user)
+
+#     @transaction.atomic
+#     def create(self, request, *args, **kwargs):
+#         """
+#         Custom create method that ensures the payment is tied to a valid schedule,
+#         updates the schedule, and sets the admin user who processed the payment.
+#         """
+#         # The user must be an admin to record payments.
+#         if not request.user.is_staff:
+#             return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+
+#         # The serializer now handles all the payment processing logic,
+#         # including the loan balance update and finding the payment schedule.
+#         # We just need to ensure the serializer is valid and then save it.
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         self.perform_create(serializer)
+#         headers = self.get_success_headers(serializer.data)
+#         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
 # A ViewSet for managing payment-related operations.
 class PaymentViewSet(viewsets.ModelViewSet):
     """
@@ -400,41 +443,40 @@ class PaymentViewSet(viewsets.ModelViewSet):
     Admins can create and view all payments.
     Customers can only view payments related to their loans.
     """
-    queryset = Payment.objects.all()
+    # The queryset is now configured to pre-fetch related data,
+    # which is essential to avoid the "null" issue for the loan_id.
+    queryset = Payment.objects.all().select_related('payment_schedule__loan')
     serializer_class = PaymentSerializer
-    # This permission ensures only authenticated users can access this viewset.
-    # The actual access control is handled in get_queryset().
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """
         Filters the payments queryset based on the user's role.
         """
-        # Admins can view all payments.
+        # Admins can view all payments. We use select_related for efficiency.
         if self.request.user.is_staff:
-            return Payment.objects.all()
+            return Payment.objects.all().select_related('payment_schedule__loan')
+
         # Customers can only view payments related to their loans.
-        # This filter correctly links payments to the user's loan applications.
-        return Payment.objects.filter(payment_schedule__loan__application__user=self.request.user)
+        # We also use select_related here to ensure the loan_id field is populated.
+        return Payment.objects.filter(
+            payment_schedule__loan__application__user=self.request.user
+        ).select_related('payment_schedule__loan')
 
-    @transaction.atomic
-    def create(self, request, *args, **kwargs):
-        """
-        Custom create method that ensures the payment is tied to a valid schedule,
-        updates the schedule, and sets the admin user who processed the payment.
-        """
-        # The user must be an admin to record payments.
-        if not request.user.is_staff:
-            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+    # The custom `create` method has been removed.
+    # The default DRF `perform_create` method is sufficient and more robust.
+    # The permission check for `is_staff` is now handled by the `perform_create`
+    # method in a more standard way.
 
-        # The serializer now handles all the payment processing logic,
-        # including the loan balance update and finding the payment schedule.
-        # We just need to ensure the serializer is valid and then save it.
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    def perform_create(self, serializer):
+        # We perform the admin check here, as this is the standard DRF hook for creation logic.
+        if not self.request.user.is_staff:
+            # Raising a permission denied exception is the standard DRF way
+            # to handle this, which returns a 403 Forbidden response.
+            raise permissions.PermissionDenied("You do not have permission to perform this action.")
+        
+        # The serializer.save() call handles all the business logic defined in your serializer.
+        serializer.save()
 
 
 # A ViewSet for a customer to manage their user details and profile.
@@ -808,42 +850,3 @@ class LoanSearchAPIView(ListAPIView):
                 )
         return queryset.filter(disbursed=True)
 
-# A view to process payments for a specific loan.
-class PaymentAPIView(APIView):
-    """
-    API view to process payments for a specific loan.
-    """
-    permission_classes = [IsAuthenticated]
-
-    @transaction.atomic
-    def post(self, request, *args, **kwargs):
-        loan_id = request.data.get('loan_pk')
-        amount_paid = request.data.get('amount_paid')
-        
-        if not loan_id or not amount_paid:
-            return Response({"error": "Loan ID and amount are required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            loan = Loan.objects.get(pk=loan_id, disbursed=True)
-        except Loan.DoesNotExist:
-            return Response({"error": "Loan not found or not disbursed."}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Validate payment amount
-        amount_paid = Decimal(amount_paid)
-        if amount_paid <= 0:
-            return Response({"error": "Payment amount must be a positive number."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Update loan balance
-        loan.balance -= amount_paid
-        
-        # Create a new payment record
-        Payment.objects.create(
-            loan=loan,
-            amount_paid=amount_paid,
-            recorded_by=request.user
-        )
-        
-        # Save the updated loan
-        loan.save()
-        
-        return Response({"message": "Payment processed successfully!", "new_balance": loan.balance}, status=status.HTTP_201_CREATED)

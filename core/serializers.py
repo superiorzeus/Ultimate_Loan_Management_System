@@ -4,6 +4,9 @@ from django.db import transaction
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
+from django.shortcuts import get_object_or_404
+import uuid
+from django.utils import timezone
 
 # A simple serializer for the CustomerProfile model.
 class CustomerSerializer(serializers.ModelSerializer):
@@ -65,28 +68,46 @@ class LoanTypeSerializer(serializers.ModelSerializer):
 
 # A serializer for the Payment model.
 class PaymentSerializer(serializers.ModelSerializer):
-    # This field is for writing only and links to the Loan via the payment schedule.
-    # It allows you to pass a loan_pk from the front end.
+    # This field is for writing only, linking to the Loan via the payment schedule.
+    # It allows you to pass a loan_pk from the frontend.
     loan_pk = serializers.PrimaryKeyRelatedField(
         queryset=Loan.objects.all(),
         write_only=True
     )
 
+    # This field will return the username of the user who recorded the payment.
+    # It works because the path 'recorded_by.username' is valid.
+    recorded_by_username = serializers.CharField(source='recorded_by.username', read_only=True)
+    
+    # This is the new, robust field to get the Loan ID.
+    # We use a SerializerMethodField to handle potential missing data gracefully.
+    loan_id = serializers.SerializerMethodField()
+
     class Meta:
         model = Payment
-        fields = ['id', 'amount_paid', 'payment_date', 'recorded_by', 'transaction_id', 'loan_pk']
-        read_only_fields = ['id', 'recorded_by', 'transaction_id']
+        fields = [
+            'id', 'amount_paid', 'payment_date', 'transaction_id', 'loan_pk',
+            'recorded_by_username', 'loan_id'
+        ]
+        read_only_fields = ['id', 'transaction_id', 'recorded_by_username', 'loan_id']
+
+    # New method for our SerializerMethodField to get the loan_id
+    def get_loan_id(self, obj):
+        """
+        Retrieves the Loan ID from the Payment's payment_schedule.
+        Returns None if the path is not valid, preventing errors.
+        """
+        try:
+            return str(obj.payment_schedule.loan.id)
+        except (AttributeError, PaymentSchedule.DoesNotExist):
+            return None
 
     @transaction.atomic
     def create(self, validated_data):
-        """
-        Handles the creation of a Payment and updates the related Loan and PaymentSchedule.
-        This method contains all the business logic for payment processing.
-        """
         # Retrieve the loan object using the provided loan_pk
-        loan = get_object_or_404(Loan, pk=validated_data.pop('loan_pk').pk)
+        loan = get_object_or_404(Loan, pk=validated_data.pop('loan_pk'))
         
-        # Get the amount paid, which is already a Decimal due to the model field type
+        # Get the amount paid, which is already a Decimal
         amount_paid = validated_data.get('amount_paid')
 
         # Get the first unpaid payment schedule for the loan
@@ -128,6 +149,8 @@ class PaymentSerializer(serializers.ModelSerializer):
             transaction_id=uuid.uuid4()
         )
         
+        # This is the crucial fix for the AssertionError.
+        # It must return the created object instance.
         return payment
 
 # A new serializer for the PaymentSchedule model. This is used to display the full payment plan.
