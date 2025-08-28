@@ -120,7 +120,7 @@
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead>
                                 <tr>
-                                    <th scope="col" class="py-3">Payment ID</th>
+                                    <th scope="col" class="py-3">Customer Name</th>
                                     <th scope="col" class="py-3">Amount</th>
                                     <th scope="col" class="py-3">Date</th>
                                     <th scope="col" class="py-3">Recorded By</th>
@@ -244,8 +244,8 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead>
                             <tr>
-                                <th scope="col" class="py-3">Payment ID</th>
-                                <th scope="col" class="py-3">Loan</th>
+                                <!-- <th scope="col" class="py-3">Payment ID</th> -->
+                                <th scope="col" class="py-3">Customer Name</th>
                                 <th scope="col" class="py-3">Amount</th>
                                 <th scope="col" class="py-3">Date</th>
                                 <th scope="col" class="py-3">Recorded By</th>
@@ -372,7 +372,7 @@
                 if (payments.length > 0) {
                     const paymentsHtml = payments.slice(0, 5).map(payment => `
                         <tr class="transition-colors duration-200 hover:bg-gray-50">
-                            <td>${payment.id}</td>
+                            <td>${payment.customer_name || 'N/A'}</td>
                             <td>${formatCurrency(payment.amount_paid)}</td>
                             <td>${new Date(payment.payment_date).toISOString().slice(0, 10)}</td>
                             <td>${payment.recorded_by_username || 'N/A'}</td>
@@ -526,8 +526,7 @@
 
                 const paymentsHtml = payments.map(payment => `
                     <tr class="transition-colors duration-200 hover:bg-gray-50">
-                        <td>${payment.id}</td>
-                        <td>${payment.loan_id}</td>
+                        <td>${payment.customer_name || 'N/A'}</td>
                         <td>${formatCurrency(payment.amount_paid)}</td>
                         <td>${new Date(payment.payment_date).toISOString().slice(0, 10)}</td>
                         <td>${payment.recorded_by_username || 'N/A'}</td>

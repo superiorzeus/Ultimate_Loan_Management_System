@@ -69,34 +69,30 @@ class LoanTypeSerializer(serializers.ModelSerializer):
 # A serializer for the Payment model.
 class PaymentSerializer(serializers.ModelSerializer):
     # This field is for writing only, linking to the Loan via the payment schedule.
-    # It allows you to pass a loan_pk from the frontend.
     loan_pk = serializers.PrimaryKeyRelatedField(
         queryset=Loan.objects.all(),
         write_only=True
     )
 
+    # This is for displaying the customer's name in the list view
+    customer_name = serializers.CharField(source='payment_schedule.loan.application.user.name', read_only=True)
+
     # This field will return the username of the user who recorded the payment.
-    # It works because the path 'recorded_by.username' is valid.
     recorded_by_username = serializers.CharField(source='recorded_by.username', read_only=True)
     
-    # This is the new, robust field to get the Loan ID.
-    # We use a SerializerMethodField to handle potential missing data gracefully.
+    # Getting the Loan ID.
     loan_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
         fields = [
             'id', 'amount_paid', 'payment_date', 'transaction_id', 'loan_pk',
-            'recorded_by_username', 'loan_id'
+            'recorded_by_username', 'loan_id', 'customer_name'
         ]
-        read_only_fields = ['id', 'transaction_id', 'recorded_by_username', 'loan_id']
+        read_only_fields = ['id', 'transaction_id', 'recorded_by_username', 'loan_id', 'customer_name']
 
     # New method for our SerializerMethodField to get the loan_id
     def get_loan_id(self, obj):
-        """
-        Retrieves the Loan ID from the Payment's payment_schedule.
-        Returns None if the path is not valid, preventing errors.
-        """
         try:
             return str(obj.payment_schedule.loan.id)
         except (AttributeError, PaymentSchedule.DoesNotExist):
