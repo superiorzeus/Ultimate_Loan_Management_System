@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Payments</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+    </style>
+    <!-- Django template tag for CSRF token -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
+</head>
+<!-- Django template tag for auth token -->
+<body class="p-6" data-auth-token="{{ auth_token }}">
+
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-lg">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">Add Payment</h2>
+        </div>
+
+        <!-- Search Loan Section -->
+        <div class="mb-6 bg-gray-50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold text-gray-700 mb-4">Find Loan</h3>
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                <div class="relative w-full">
+                    <input type="text" id="loanSearchInput" placeholder="Search by Loan ID or customer name"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <button id="searchButton" class="w-full sm:w-auto px-6 py-2 rounded-lg text-white font-semibold transition duration-200 bg-blue-600 hover:bg-blue-700">
+                    Search
+                </button>
+            </div>
+            <!-- Search Results Display -->
+            <div id="searchResults" class="mt-4 border border-gray-200 rounded-lg shadow-sm" style="display:none;">
+                <!-- Search results will be dynamically added here -->
+            </div>
+        </div>
+
+        <!-- Loan Details Section -->
+        <div id="loanDetailsSection" class="mb-6 bg-gray-100 p-6 rounded-lg" style="display:none;">
+            <h3 class="text-xl font-semibold text-gray-700 mb-4">Loan Details</h3>
+            <div class="space-y-4 text-sm text-gray-600">
+                <div><strong>Loan ID:</strong> <span id="loanIdDisplay" class="font-medium text-gray-800"></span></div>
+                <div><strong>Customer:</strong> <span id="customerNameDisplay" class="font-medium text-gray-800"></span></div>
+                <div><strong>Current Balance:</strong> <span id="currentBalanceDisplay" class="font-medium text-gray-800"></span></div>
+                <div><strong>Remaining Term:</strong> <span id="remainingTermDisplay" class="font-medium text-gray-800"></span></div>
+            </div>
+        </div>
+
+        <!-- Add Payment Section -->
+        <div id="paymentFormContainer" style="display:none;">
+            <form id="paymentForm">
+                <div class="mb-6 bg-gray-50 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Process Payment</h3>
+                    <input type="hidden" id="loanPkInput" name="loan_pk">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="amount_paid" class="block text-sm font-medium text-gray-700">Amount Paid ($)</label>
+                            <input type="number" step="0.01" id="amount_paid" name="amount_paid" required
+                                class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="payment_date" class="block text-sm font-medium text-gray-700">Payment Date</label>
+                            <input type="date" id="payment_date" name="payment_date" required
+                                class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg text-white font-semibold transition duration-200">
+                    Submit Payment
+                </button>
+            </form>
+        </div>
+
+        <div id="messageDiv" style="display:none;"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchButton = document.getElementById('searchButton');
+            const loanSearchInput = document.getElementById('loanSearchInput');
+            const searchResults = document.getElementById('searchResults');
+            const loanDetailsSection = document.getElementById('loanDetailsSection');
+            const paymentFormContainer = document.getElementById('paymentFormContainer');
+            const messageDiv = document.getElementById('messageDiv');
+            const paymentForm = document.getElementById('paymentForm');
+
+            // Get the CSRF token from the meta tag created by Django
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+            // Get the authentication token from the data attribute on the body or a script tag
+            const authToken = document.body.dataset.authToken;
+
+            searchButton.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const query = loanSearchInput.value.trim();
+                
+                // Hide details section and message div at the start of a new search
+                loanDetailsSection.style.display = 'none';
+                paymentFormContainer.style.display = 'none';
+                messageDiv.style.display = 'none';
+
+                if (query === '') {
+                    messageDiv.style.display = 'block';
+                    messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-red-100 text-red-700';
+                    messageDiv.textContent = 'Please enter a search query.';
+                    return;
+                }
+
+                const searchUrl = `/api/loans/search/?q=${encodeURIComponent(query)}`;
+                
+                try {
+                    const response = await fetch(searchUrl, {
+                        headers: {
+                            // Use the authentication token here for authorization
+                            'Authorization': `Token ${authToken}`
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch loans.');
+                    }
+
+                    const loans = await response.json();
+                    
+                    searchResults.innerHTML = '';
+                    if (loans.length > 0) {
+                        searchResults.style.display = 'block';
+                        loans.forEach(loan => {
+                            const resultItem = document.createElement('div');
+                            resultItem.className = 'p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer';
+                            // Use loan.application instead of loan.id
+                            resultItem.textContent = `Loan ID: ${loan.application} - Customer: ${loan.customer_name} - Balance: $${parseFloat(loan.balance).toFixed(2)}`;
+                            resultItem.addEventListener('click', () => {
+                                displayLoanDetails(loan);
+                                searchResults.style.display = 'none';
+                                loanSearchInput.value = '';
+                            });
+                            searchResults.appendChild(resultItem);
+                        });
+                    } else {
+                        searchResults.style.display = 'block';
+                        searchResults.innerHTML = '<div class="p-3 text-gray-500">No loans found.</div>';
+                    }
+
+                } catch (error) {
+                    console.error("Search failed:", error);
+                    messageDiv.style.display = 'block';
+                    messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-red-100 text-red-700';
+                    messageDiv.textContent = 'Failed to search for loans. Please try again.';
+                }
+            });
+
+            function displayLoanDetails(loan) {
+                // Use loan.application instead of loan.id
+                document.getElementById('loanIdDisplay').textContent = loan.application;
+                document.getElementById('customerNameDisplay').textContent = loan.customer_name;
+                document.getElementById('currentBalanceDisplay').textContent = `$${parseFloat(loan.balance).toFixed(2)}`;
+                document.getElementById('remainingTermDisplay').textContent = `${loan.remaining_term} months`;
+                // Use loan.application instead of loan.id
+                document.getElementById('loanPkInput').value = loan.application;
+                loanDetailsSection.style.display = 'block';
+                paymentFormContainer.style.display = 'block';
+            }
+
+            paymentForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const formData = new FormData(paymentForm);
+                const paymentPayload = {
+                    amount_paid: formData.get('amount_paid'),
+                    payment_date: formData.get('payment_date'),
+                    loan_pk: formData.get('loan_pk'),
+                };
+
+                const paymentUrl = `/api/payments/`;
+                
+                try {
+                    const response = await fetch(paymentUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken,
+                            // Use the authentication token here for authorization
+                            'Authorization': `Token ${authToken}`
+                        },
+                        body: JSON.stringify(paymentPayload)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        messageDiv.style.display = 'block';
+                        messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-green-100 text-green-700';
+                        messageDiv.textContent = result.message || 'Payment processed successfully!';
+                        paymentForm.reset();
+                        loanDetailsSection.style.display = 'none';
+                        paymentFormContainer.style.display = 'none';
+                    } else {
+                        messageDiv.style.display = 'block';
+                        messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-red-100 text-red-700';
+                        messageDiv.textContent = `Error: ${JSON.stringify(result)}`;
+                    }
+
+                } catch (error) {
+                    console.error("Payment submission failed:", error);
+                    messageDiv.style.display = 'block';
+                    messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-red-100 text-red-700';
+                    messageDiv.textContent = 'Form submission failed. Please try again.';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

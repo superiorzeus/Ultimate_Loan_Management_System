@@ -15,6 +15,8 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from django.contrib import messages
+from decimal import Decimal
+import uuid
 
 # Django Rest Framework imports
 from rest_framework import viewsets, status, permissions, mixins
@@ -25,6 +27,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import ListAPIView, UpdateAPIView, ListCreateAPIView
+from rest_framework.filters import SearchFilter
 
 # Models imports
 from .models import User, CustomerProfile, LoanType, LoanApplication, Loan, Payment, PaymentSchedule
@@ -413,51 +416,25 @@ class PaymentViewSet(viewsets.ModelViewSet):
         # Customers can only view payments related to their loans.
         # This filter correctly links payments to the user's loan applications.
         return Payment.objects.filter(payment_schedule__loan__application__user=self.request.user)
-    
+
     @transaction.atomic
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
         """
         Custom create method that ensures the payment is tied to a valid schedule,
         updates the schedule, and sets the admin user who processed the payment.
         """
         # The user must be an admin to record payments.
-        if not self.request.user.is_staff:
+        if not request.user.is_staff:
             return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Get the payment schedule object from the validated data.
-        payment_schedule = serializer.validated_data.get('payment_schedule')
-
-        # Check if a payment has already been recorded for this schedule.
-        # This prevents double-processing of payments.
-        if payment_schedule.is_paid:
-            return Response({"detail": "This payment has already been recorded."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Calculate the amount of principal and interest to be paid off based on the payment amount.
-        amount_to_pay = serializer.validated_data.get('amount_paid')
-        remaining_interest = payment_schedule.interest_due
-        remaining_principal = payment_schedule.principal_due
-        
-        # Pay off interest first.
-        interest_paid = min(amount_to_pay, remaining_interest)
-        principal_paid = 0
-
-        if amount_to_pay > remaining_interest:
-            principal_paid = amount_to_pay - interest_paid
-
-        # Update the payment schedule with the new remaining amounts.
-        payment_schedule.interest_due = remaining_interest - interest_paid
-        payment_schedule.principal_due = remaining_principal - principal_paid
-
-        # Check if the payment amount is enough to pay off the full scheduled amount.
-        # Use a small tolerance for float comparison to avoid issues.
-        if payment_schedule.principal_due <= 0.01 and payment_schedule.interest_due <= 0.01:
-            payment_schedule.is_paid = True
-            payment_schedule.date_paid = timezone.now().date()
-        
-        payment_schedule.save()
-
-        # Save the payment with the user who processed it.
-        serializer.save(recorded_by=self.request.user)
+        # The serializer now handles all the payment processing logic,
+        # including the loan balance update and finding the payment schedule.
+        # We just need to ensure the serializer is valid and then save it.
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 # A ViewSet for a customer to manage their user details and profile.
@@ -783,3 +760,90 @@ def loan_application_detail_view(request, pk):
 
     # Otherwise, render the HTML page as normal
     return render(request, 'loan_application_detail.html', {'user': request.user})
+
+# A view to render the add_payment.html template
+@login_required
+def add_payment_view(request):
+    """
+    Renders the add payment form page and passes the user's auth token.
+    """
+    try:
+        # Attempt to get the auth token for the current user
+        token = Token.objects.get(user=request.user).key
+    except Token.DoesNotExist:
+        # Handle case where a token doesn't exist for the user
+        token = None
+    
+    context = {
+        'auth_token': token
+    }
+    return render(request, 'add_payment.html', context)
+
+# A view to search for loans by customer name or loan ID.
+class LoanSearchAPIView(ListAPIView):
+    """
+    API view to search for loans by customer name or loan ID.
+    """
+    queryset = Loan.objects.all()
+    serializer_class = LoanSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [SearchFilter]
+    search_fields = ['id', 'application__user__name', 'application__user__username']
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        query = self.request.query_params.get('q', None)
+        if query:
+            # Try to get the loan by its primary key
+            try:
+                # We use an exact lookup for the primary key
+                loan = queryset.get(pk=int(query))
+                return queryset.filter(pk=loan.pk)
+            except (ValueError, Loan.DoesNotExist):
+                # If the query is not a number or the loan is not found,
+                # fall back to searching other fields using icontains
+                queryset = queryset.filter(
+                    Q(application__user__name__icontains=query) |
+                    Q(application__user__username__icontains=query)
+                )
+        return queryset.filter(disbursed=True)
+
+# A view to process payments for a specific loan.
+class PaymentAPIView(APIView):
+    """
+    API view to process payments for a specific loan.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        loan_id = request.data.get('loan_pk')
+        amount_paid = request.data.get('amount_paid')
+        
+        if not loan_id or not amount_paid:
+            return Response({"error": "Loan ID and amount are required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            loan = Loan.objects.get(pk=loan_id, disbursed=True)
+        except Loan.DoesNotExist:
+            return Response({"error": "Loan not found or not disbursed."}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Validate payment amount
+        amount_paid = Decimal(amount_paid)
+        if amount_paid <= 0:
+            return Response({"error": "Payment amount must be a positive number."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update loan balance
+        loan.balance -= amount_paid
+        
+        # Create a new payment record
+        Payment.objects.create(
+            loan=loan,
+            amount_paid=amount_paid,
+            recorded_by=request.user
+        )
+        
+        # Save the updated loan
+        loan.save()
+        
+        return Response({"message": "Payment processed successfully!", "new_balance": loan.balance}, status=status.HTTP_201_CREATED)

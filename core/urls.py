@@ -8,7 +8,7 @@ from .views import (
     LoanApplicationViewSet, LoanViewSet, PaymentViewSet, 
     UserRegisterView, CustomerViewSet, PaymentScheduleViewSet, register_view,
     index, login_view, dashboard_view, logout_and_redirect, AdminCreateCustomerView, add_customer_view, CustomerListView, customer_detail_view, SummaryViewSet,
-    create_loan_application_view, LoanTypeManageView, loan_detail_view, loan_application_detail_view
+    create_loan_application_view, LoanTypeManageView, loan_detail_view, loan_application_detail_view, LoanSearchAPIView, PaymentAPIView
 )
 
 
@@ -69,7 +69,16 @@ urlpatterns = [
 
     # URL for the loan application detail page
     path('loan-applications/<int:pk>/', loan_application_detail_view, name='loan-application-detail'),
+
+    # URL for searching loans
+    path('api/loans/search/', views.LoanSearchAPIView.as_view(), name='loan-search'),
     
+    # URL for processing payments
+    path('api/payments/', views.PaymentAPIView.as_view(), name='process-payment'),
+
+    # URL for the add payment page
+    path('add-payment/', views.add_payment_view, name='add-payment'),
+
     # Include the router-generated URLs
     path('api/', include(router.urls)),
 ]

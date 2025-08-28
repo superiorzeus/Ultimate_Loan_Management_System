@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from .models import User, CustomerProfile, LoanApplication, Loan, Payment, LoanType, PaymentSchedule
 from django.db import transaction
+from datetime import date
+from dateutil.relativedelta import relativedelta
+from decimal import Decimal
 
 # A simple serializer for the CustomerProfile model.
 class CustomerSerializer(serializers.ModelSerializer):
@@ -62,13 +65,70 @@ class LoanTypeSerializer(serializers.ModelSerializer):
 
 # A serializer for the Payment model.
 class PaymentSerializer(serializers.ModelSerializer):
-    # The recorded_by field is read-only because it's set by the backend.
-    recorded_by = serializers.PrimaryKeyRelatedField(read_only=True)
-    
+    # This field is for writing only and links to the Loan via the payment schedule.
+    # It allows you to pass a loan_pk from the front end.
+    loan_pk = serializers.PrimaryKeyRelatedField(
+        queryset=Loan.objects.all(),
+        write_only=True
+    )
+
     class Meta:
         model = Payment
-        fields = ['id', 'amount_paid', 'payment_date', 'recorded_by']
-        read_only_fields = ['payment_date', 'recorded_by']
+        fields = ['id', 'amount_paid', 'payment_date', 'recorded_by', 'transaction_id', 'loan_pk']
+        read_only_fields = ['id', 'recorded_by', 'transaction_id']
+
+    @transaction.atomic
+    def create(self, validated_data):
+        """
+        Handles the creation of a Payment and updates the related Loan and PaymentSchedule.
+        This method contains all the business logic for payment processing.
+        """
+        # Retrieve the loan object using the provided loan_pk
+        loan = get_object_or_404(Loan, pk=validated_data.pop('loan_pk').pk)
+        
+        # Get the amount paid, which is already a Decimal due to the model field type
+        amount_paid = validated_data.get('amount_paid')
+
+        # Get the first unpaid payment schedule for the loan
+        payment_schedule = PaymentSchedule.objects.filter(loan=loan, is_paid=False).first()
+        
+        if not payment_schedule:
+            raise serializers.ValidationError({"detail": "No pending payment schedule found for this loan."})
+
+        # Calculate interest and principal paid
+        remaining_interest = payment_schedule.interest_due
+        interest_paid = min(amount_paid, remaining_interest)
+        
+        principal_paid = Decimal('0.0')
+        if amount_paid > remaining_interest:
+            principal_paid = amount_paid - interest_paid
+
+        # Update the payment schedule with the new remaining amounts.
+        payment_schedule.interest_due -= interest_paid
+        payment_schedule.principal_due -= principal_paid
+
+        # Update the loan balance
+        loan.balance -= Decimal(amount_paid)
+        
+        # Mark payment schedule as paid if the full amount is covered
+        if payment_schedule.principal_due <= Decimal('0.01') and payment_schedule.interest_due <= Decimal('0.01'):
+            payment_schedule.is_paid = True
+            payment_schedule.date_paid = timezone.now().date()
+        
+        # Save both the updated loan and payment schedule
+        payment_schedule.save()
+        loan.save()
+        
+        # Create the Payment instance and link it to the schedule and user
+        payment = Payment.objects.create(
+            payment_schedule=payment_schedule,
+            amount_paid=amount_paid,
+            payment_date=validated_data.get('payment_date'),
+            recorded_by=self.context['request'].user,
+            transaction_id=uuid.uuid4()
+        )
+        
+        return payment
 
 # A new serializer for the PaymentSchedule model. This is used to display the full payment plan.
 class PaymentScheduleSerializer(serializers.ModelSerializer):
@@ -92,18 +152,25 @@ class LoanPaymentSerializer(serializers.ModelSerializer):
         
 # A serializer for the Loan model. It now includes the PaymentSchedule.
 class LoanSerializer(serializers.ModelSerializer):
-    # This read-only field gets the user's name from the related User model
     customer_name = serializers.CharField(source='application.user.name', read_only=True)
-    loan_type_name = serializers.CharField(source='application.loan_type.name', read_only=True)
-
+    loan_type_name = serializers.CharField(source='application.loan_type.loan_type_name', read_only=True)
+    
+    # New computed field to return the remaining term
+    remaining_term = serializers.SerializerMethodField()
+    
     class Meta:
         model = Loan
-        fields = [
-            'application', 'customer_name', 'loan_type_name',
-            'amount', 'interest_rate', 'term_months', 'balance',
-            'start_date', 'end_date', 'disbursed', 'disbursement_date'
-        ]
-        read_only_fields = ['application', 'amount', 'interest_rate', 'term_months', 'balance', 'start_date', 'end_date', 'disbursed', 'disbursement_date']
+        # Removed 'id' from fields, as 'application' is the primary key
+        fields = ['application', 'customer_name', 'loan_type_name', 'amount', 'interest_rate', 'term_months', 'start_date', 'end_date', 'balance', 'disbursed', 'disbursement_date', 'remaining_term']
+
+    def get_remaining_term(self, obj):
+        if obj.disbursed and obj.disbursement_date:
+            today = date.today()
+            # Use relativedelta to calculate the difference in months
+            delta = relativedelta(obj.end_date, today)
+            # The remaining term is the sum of full years and months
+            return delta.years * 12 + delta.months
+        return 0
 
 
 # A serializer for the LoanApplication model.
