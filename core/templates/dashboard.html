@@ -244,11 +244,11 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead>
                             <tr>
-                                <!-- <th scope="col" class="py-3">Payment ID</th> -->
                                 <th scope="col" class="py-3">Customer Name</th>
                                 <th scope="col" class="py-3">Amount</th>
                                 <th scope="col" class="py-3">Date</th>
                                 <th scope="col" class="py-3">Recorded By</th>
+                                <th scope="col" class="py-3">Action</th>
                             </tr>
                         </thead>
                         <tbody id="payments-table-body" class="bg-white divide-y divide-gray-200">
@@ -352,7 +352,7 @@
         };
 
         const formatCurrency = (amount) => {
-            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'GHS' }).format(amount);
+            return new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS' }).format(amount);
         };
         
         // fetchDashboardData function
@@ -530,6 +530,7 @@
                         <td>${formatCurrency(payment.amount_paid)}</td>
                         <td>${new Date(payment.payment_date).toISOString().slice(0, 10)}</td>
                         <td>${payment.recorded_by_username || 'N/A'}</td>
+                        <td><a href="/payments/${payment.id}" class="inline-block bg-blue-500 text-white text-xs px-2 py-1 rounded-md hover:bg-blue-600 transition-colors duration-200">View</a></td>
                     </tr>
                 `).join('');
                 paymentsTableBody.innerHTML = paymentsHtml || '<tr><td colspan="5" class="text-center py-4 text-gray-500">No payments found.</td></tr>';

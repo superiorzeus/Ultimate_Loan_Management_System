@@ -850,3 +850,13 @@ class LoanSearchAPIView(ListAPIView):
                 )
         return queryset.filter(disbursed=True)
 
+# A view to render the payment detail page
+@login_required
+def payment_detail_view(request, pk):
+    """
+    View to render the payment detail page.
+    """
+    context = {
+        'payment_pk': pk
+    }
+    return render(request, 'payment_detail.html', context)
