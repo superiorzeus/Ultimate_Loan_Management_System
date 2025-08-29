@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% load custom_filters %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -148,11 +149,7 @@
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for app in loan_applications %}
                         <tr class="transition-colors duration-200 hover:bg-gray-50">
-                            <!-- <td class="px-6 py-4 whitespace-nowrap">{{ app.amount_requested }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ app.loan_purpose }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ app.status }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ app.submission_date|date:"Y-m-d" }}</td> -->
-                            <td class="px-6 py-4 whitespace-nowrap">{{ app.amount }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ app.amount|format_currency }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ app.purpose }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ app.status }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ app.created_at|date:"d-m-Y" }}</td>
@@ -184,8 +181,8 @@
                         {% for loan in loans %}
                         <tr class="transition-colors duration-200 hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap">{{ loan.pk }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.amount }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.balance }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.amount|format_currency }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ loan.balance|format_currency }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ loan.status }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ loan.disbursement_date|date:"d-m-Y" }}</td>
                         </tr>
@@ -215,8 +212,8 @@
                         {% for payment in payments %}
                         <tr class="transition-colors duration-200 hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap">{{ payment.pk }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ payment.amount_paid }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">{{ payment.payment_date|date:"Y-m-d H:i:s" }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ payment.amount_paid|format_currency }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ payment.payment_date|date:"Y-m-d" }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">{{ payment.payment_schedule.loan.pk }}</td>
                         </tr>
                         {% endfor %}
