@@ -18,7 +18,7 @@ def create_loan_on_approval(sender, instance, created, **kwargs):
     The total interest is calculated and added to the balance upfront.
     """
     # Check if the application's status is 'approved'
-    # We also check if a loan doesn't already exist for this application to prevent duplicates
+    # Also checks if a loan doesn't already exist for this application to prevent duplicates
     if instance.status == 'approved' and not hasattr(instance, 'loan'):
         # Calculate the end date for the loan
         end_date = date.today() + relativedelta(months=+instance.loan_type.term_months)

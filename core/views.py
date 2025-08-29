@@ -1,5 +1,3 @@
-# core/views.py
-
 # Django imports
 import requests
 import json
@@ -41,7 +39,7 @@ from .serializers import (
     CustomerSerializer, SummarySerializer
 )
 
-# A new view to render the index.html template.
+# A view to render the index.html template.
 def index(request):
     """Renders the main index page for the front-end application."""
     return render(request, 'index.html')
@@ -210,7 +208,7 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
     queryset = LoanApplication.objects.all()
     serializer_class = LoanApplicationSerializer
 
-    # Add this custom action to create a unique URL for the list view.
+    # Custom action to create a unique URL for the list view.
     @action(detail=False, methods=['get'], url_path='list-applications')
     def list_applications(self, request):
         applications = self.get_queryset()
@@ -331,7 +329,7 @@ class LoanViewSet(viewsets.ModelViewSet):
             interest_rate = float(loan_type.interest_rate) / 100
             term_months = loan_type.term_months
             
-            # --- Payment Schedule Calculation Logic based on your rules ---
+            # --- Payment Schedule Calculation Logic ---
             if loan_type.interest_rate_type == 'flat_rate':
                 total_interest = total_amount * interest_rate
                 total_payable = total_amount + total_interest
@@ -392,110 +390,7 @@ class LoanViewSet(viewsets.ModelViewSet):
             return Response({"detail": f"An error occurred: {str(e)}"},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-# # A ViewSet for managing payment-related operations.
-# class PaymentViewSet(viewsets.ModelViewSet):
-#     """
-#     ViewSet for managing payments.
-#     Admins can create and view all payments.
-#     Customers can only view payments related to their loans.
-#     """
-#     queryset = Payment.objects.all()
-#     serializer_class = PaymentSerializer
-#     # This permission ensures only authenticated users can access this viewset.
-#     # The actual access control is handled in get_queryset().
-#     permission_classes = [IsAuthenticated]
-
-#     def get_queryset(self):
-#         """
-#         Filters the payments queryset based on the user's role.
-#         """
-#         # Admins can view all payments.
-#         if self.request.user.is_staff:
-#             return Payment.objects.all()
-#         # Customers can only view payments related to their loans.
-#         # This filter correctly links payments to the user's loan applications.
-#         return Payment.objects.filter(payment_schedule__loan__application__user=self.request.user)
-
-#     @transaction.atomic
-#     def create(self, request, *args, **kwargs):
-#         """
-#         Custom create method that ensures the payment is tied to a valid schedule,
-#         updates the schedule, and sets the admin user who processed the payment.
-#         """
-#         # The user must be an admin to record payments.
-#         if not request.user.is_staff:
-#             return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
-
-#         # The serializer now handles all the payment processing logic,
-#         # including the loan balance update and finding the payment schedule.
-#         # We just need to ensure the serializer is valid and then save it.
-#         serializer = self.get_serializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         self.perform_create(serializer)
-#         headers = self.get_success_headers(serializer.data)
-#         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-
-# # A ViewSet for managing payment-related operations.
-# class PaymentViewSet(viewsets.ModelViewSet):
-#     """
-#     ViewSet for managing payments.
-#     Admins can create and view all payments.
-#     Customers can only view payments related to their loans.
-#     """
-#     # The queryset is now configured to pre-fetch related data,
-#     # which is essential to avoid the "null" issue for the loan_id.
-#     queryset = Payment.objects.all().select_related('payment_schedule__loan')
-#     serializer_class = PaymentSerializer
-#     permission_classes = [IsAuthenticated]
-
-#     def get_queryset(self):
-#         """
-#         Filters the payments queryset based on the user's role.
-#         """
-#         # Admins can view all payments. We use select_related for efficiency.
-#         if self.request.user.is_staff:
-#             return Payment.objects.all().select_related('payment_schedule__loan')
-
-#         # Customers can only view payments related to their loans.
-#         # We also use select_related here to ensure the loan_id field is populated.
-#         return Payment.objects.filter(
-#             payment_schedule__loan__application__user=self.request.user
-#         ).select_related('payment_schedule__loan')
-
-#     # The custom `create` method has been removed.
-#     # The default DRF `perform_create` method is sufficient and more robust.
-#     # The permission check for `is_staff` is now handled by the `perform_create`
-#     # method in a more standard way.
-
-#     def perform_create(self, serializer):
-#         # We perform the admin check here, as this is the standard DRF hook for creation logic.
-#         if not self.request.user.is_staff:
-#             # Raising a permission denied exception is the standard DRF way
-#             # to handle this, which returns a 403 Forbidden response.
-#             raise permissions.PermissionDenied("You do not have permission to perform this action.")
-        
-#         # The serializer.save() call handles all the business logic defined in your serializer.
-#         serializer.save()
-
- # A ViewSet for managing payment-related operations.
-# class PaymentViewSet(viewsets.ReadOnlyModelViewSet):  # 👈 only read operations
-#     """
-#     ViewSet for viewing payments.
-#     Admins can view all payments.
-#     Customers can only view payments related to their loans.
-#     """
-#     queryset = Payment.objects.all().select_related('payment_schedule__loan')
-#     serializer_class = PaymentSerializer
-#     permission_classes = [IsAuthenticated]
-
-#     def get_queryset(self):
-#         if self.request.user.is_staff:
-#             return Payment.objects.all().select_related('payment_schedule__loan')
-#         return Payment.objects.filter(
-#             payment_schedule__loan__application__user=self.request.user
-#         ).select_related('payment_schedule__loan')
-
+ # A ViewSet for managing payments.
 class PaymentViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing payments.
@@ -680,7 +575,6 @@ def add_customer_view(request):
     return render(request, 'add_customer.html')
 
 # A view to list all customers (non-staff, non-superuser).
-# This is a good practice to separate concerns from the main UserViewSet.
 class CustomerListView(ListAPIView):
     """
     API view to list all non-admin customer users.
@@ -712,19 +606,13 @@ def customer_detail_view(request, username):
             customer_user.is_active = False
             messages.warning(request, f'Account for {customer_user.name} has been deactivated.')
         customer_user.save()
-        # --- START OF CORRECTED LINE ---
-        # Redirect back to the same page with the updated status using the correct URL name
         return redirect('customer-detail', username=customer_user.username)
-        # --- END OF CORRECTED LINE ---
-    # --- END OF ADDED CODE ---
-
     # Get related data
     try:
         customer_profile = CustomerProfile.objects.get(user=customer_user)
     except CustomerProfile.DoesNotExist:
         customer_profile = None
-
-    # Corrected line: 'created_at' is the correct field for sorting by submission date
+        # Fetch related loan applications, loans, and payments
     loan_applications = LoanApplication.objects.filter(user=customer_user).order_by('-created_at')
     loans = Loan.objects.filter(application__user=customer_user).order_by('-disbursement_date')
     payments = Payment.objects.filter(payment_schedule__loan__application__user=customer_user).order_by('-payment_date')
@@ -777,7 +665,6 @@ def create_loan_application_view(request):
         
         api_url = 'http://127.0.0.1:8000/api/loan-applications/'
         
-        # --- START OF UPDATED CODE ---
         try:
             user_token = Token.objects.get(user=request.user)
             headers = {
@@ -801,9 +688,7 @@ def create_loan_application_view(request):
                 # Fallback for non-JSON responses
                 errors = {'detail': [f'API Error: {response.text}']}
             
-            # This is where we ensure the errors variable is a dictionary with a list value.
-            # Example: {"detail": ["Authentication credentials were not provided."]}
-            # If the API returns a simple string, we wrap it in a dictionary and a list.
+            # Ensure 'detail' is always a list for consistency in the template
             if isinstance(errors.get('detail'), str):
                  errors['detail'] = [errors['detail']]
 
@@ -834,13 +719,6 @@ def loan_detail_view(request, pk):
     return render(request, 'loan_detail.html', context)
 
 # Loan application detail view
-# @login_required
-# def loan_application_detail_view(request, pk):
-#     """
-#     Renders the loan application detail page.
-#     The details are fetched by the frontend JavaScript.
-#     """
-#     return render(request, 'loan_application_detail.html', {'user': request.user})
 @login_required
 def loan_application_detail_view(request, pk):
     """
@@ -891,7 +769,7 @@ class LoanSearchAPIView(ListAPIView):
         if query:
             # Try to get the loan by its primary key
             try:
-                # We use an exact lookup for the primary key
+                # Use an exact lookup for the primary key
                 loan = queryset.get(pk=int(query))
                 return queryset.filter(pk=loan.pk)
             except (ValueError, Loan.DoesNotExist):

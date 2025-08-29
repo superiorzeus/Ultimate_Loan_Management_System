@@ -1,5 +1,3 @@
-# core/urls.py
-
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
@@ -41,9 +39,8 @@ urlpatterns = [
     path('logout/', views.logout_and_redirect, name='logout'),
     # URL for the add customer page
     path('add-customer/', add_customer_view, name='add-customer'),
-    
-    # This is the crucial URL for the DRF API's registration endpoint.
-    # It must be before the `include(router.urls)` line to take precedence.
+
+    # URL for user registration via API    
     path('api/users/register/', UserRegisterView.as_view(), name='user-register'),
 
     # URL for admins to create customers directly

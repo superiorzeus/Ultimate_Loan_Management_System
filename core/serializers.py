@@ -22,7 +22,6 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     national_id = serializers.CharField(write_only=True)
     address = serializers.CharField(write_only=True)
     digital_address = serializers.CharField(write_only=True)
-    # The file fields are now required.
     national_id_front_scan = serializers.FileField(write_only=True)
     national_id_back_scan = serializers.FileField(write_only=True)
     
@@ -69,75 +68,6 @@ class LoanTypeSerializer(serializers.ModelSerializer):
 
 
 # A serializer for the Payment model.
-# class PaymentSerializer(serializers.ModelSerializer):
-#     # This field is for writing to the database
-#     # loan_pk = serializers.UUIDField(write_only=True)
-#     loan_pk = serializers.IntegerField(write_only=True)
-    
-#     # These fields are for read-only purposes when listing payments.
-#     customer_name = serializers.StringRelatedField(source='payment_schedule.loan.application.user.name', read_only=True)
-    
-#    # For Payment detail view
-#     loan_id = serializers.UUIDField(source='payment_schedule.loan.id', read_only=True)
-#     transaction_id = serializers.UUIDField(read_only=True)
-#     recorded_by_username = serializers.CharField(source='recorded_by.username', read_only=True)
-
-#     class Meta:
-#         model = Payment
-#         fields = [
-#             'id', 'amount_paid', 'payment_date', 'transaction_id', 
-#             'loan_pk', 'recorded_by_username', 'customer_name', 'loan_id'
-#         ]
-#         read_only_fields = ['id', 'payment_date', 'transaction_id', 'recorded_by_username', 'customer_name', 'loan_id']
-        
-#     def create(self, validated_data):
-#         """
-#         Custom create method to handle the payment logic.
-#         This method will find the correct PaymentSchedule and update the related Loan balance.
-#         """
-#         loan_pk = validated_data.pop('loan_pk')
-#         amount_paid = validated_data.pop('amount_paid')
-        
-#         try:
-#             with transaction.atomic():
-#                 # Get the loan based on the provided ID
-#                 loan = Loan.objects.get(pk=loan_pk)
-                
-#                 # Check if the loan is fully paid
-#                 if loan.balance <= 0:
-#                     raise serializers.ValidationError("This loan has already been fully paid.")
-                
-#                 # Get the next payment schedule
-#                 payment_schedule = loan.payment_schedule.filter(is_paid=False).order_by('due_date').first()
-                
-#                 if not payment_schedule:
-#                     raise serializers.ValidationError("No pending payment schedules for this loan.")
-                
-#                 # Update the loan balance
-#                 loan.balance -= amount_paid
-#                 if loan.balance <= 0:
-#                     loan.status = 'paid' # Mark loan as paid
-#                 loan.save()
-                
-#                 # Create the payment record
-#                 payment = Payment.objects.create(
-#                     payment_schedule=payment_schedule,
-#                     amount_paid=amount_paid,
-#                     recorded_by=self.context['request'].user
-#                 )
-                
-#                 # Update the payment schedule status
-#                 if loan.balance <= 0 or amount_paid >= payment_schedule.due_amount:
-#                     payment_schedule.is_paid = True
-#                     payment_schedule.status = 'paid'
-#                     payment_schedule.date_paid = timezone.now().date()
-#                     payment_schedule.save()
-                
-#                 return payment
-                
-#         except Loan.DoesNotExist:
-#             raise serializers.ValidationError({"loan_pk": "Loan with this ID does not exist or is not active."})
-
 class PaymentSerializer(serializers.ModelSerializer):
     # Optional loan_pk field (only needed if not coming from URL)
     loan_pk = serializers.IntegerField(write_only=True, required=False)
@@ -218,7 +148,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         except Loan.DoesNotExist:
             raise serializers.ValidationError({"loan_pk": "Loan with this ID does not exist or is not active."})
 
-# A new serializer for the PaymentSchedule model. This is used to display the full payment plan.
+# A serializer for the PaymentSchedule model. This is used to display the full payment plan.
 class PaymentScheduleSerializer(serializers.ModelSerializer):
     # Use a nested serializer to show the actual payments made against a scheduled entry.
     payments = PaymentSerializer(many=True, read_only=True)
@@ -243,12 +173,11 @@ class LoanSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='application.user.name', read_only=True)
     loan_type_name = serializers.CharField(source='application.loan_type.loan_type_name', read_only=True)
     
-    # New computed field to return the remaining term
+    # Computed field to return the remaining term
     remaining_term = serializers.SerializerMethodField()
     
     class Meta:
         model = Loan
-        # Removed 'id' from fields, as 'application' is the primary key
         fields = ['application', 'customer_name', 'loan_type_name', 'amount', 'interest_rate', 'term_months', 'start_date', 'end_date', 'balance', 'disbursed', 'disbursement_date', 'remaining_term']
 
     def get_remaining_term(self, obj):

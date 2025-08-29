@@ -111,7 +111,6 @@
             
             try {
                 const response = await fetch(`${API_BASE_URL}/api/loan-applications/${applicationId}/`);
-                // const response = await fetch(`${API_BASE_URL}/api-loan-applications/${applicationId}/`);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch application details: HTTP status ${response.status}`);
                 }
@@ -180,7 +179,6 @@
         const approveApplication = async (applicationId) => {
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
             const url = `${API_BASE_URL}/api/loan-applications/${applicationId}/approve/`;
-            // const url = `${API_BASE_URL}/api-loan-applications/${applicationId}/approve/`;
             try {
                 const response = await fetch(url, {
                     method: 'POST',
@@ -192,7 +190,7 @@
                 const result = await response.json();
                 if (response.ok) {
                     showModal('Success', result.status);
-                    fetchApplicationDetails(); // Refresh the details to show the new status
+                    fetchApplicationDetails();
                 } else {
                     showModal('Error', result.status || 'An unexpected error occurred.');
                 }
@@ -205,7 +203,6 @@
         const rejectApplication = async (applicationId) => {
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
             const url = `${API_BASE_URL}/api/loan-applications/${applicationId}/reject/`;
-            // const url = `${API_BASE_URL}/api-loan-applications/${applicationId}/reject/`;
             try {
                 const response = await fetch(url, {
                     method: 'POST',
@@ -217,7 +214,7 @@
                 const result = await response.json();
                 if (response.ok) {
                     showModal('Success', result.status);
-                    fetchApplicationDetails(); // Refresh the details to show the new status
+                    fetchApplicationDetails(); 
                 } else {
                     showModal('Error', result.status || 'An unexpected error occurred.');
                 }
@@ -241,7 +238,7 @@
                 const result = await response.json();
                 if (response.ok) {
                     showModal('Success', result.detail);
-                    fetchApplicationDetails(); // Refresh the details to show the new status
+                    fetchApplicationDetails();
                 } else {
                     showModal('Error', result.detail || 'An unexpected error occurred.');
                 }

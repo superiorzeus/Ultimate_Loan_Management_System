@@ -97,7 +97,6 @@
 
             // Get the CSRF token from the meta tag created by Django
             const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-            // Get the authentication token from the data attribute on the body or a script tag
             const authToken = document.body.dataset.authToken;
 
             searchButton.addEventListener('click', async (e) => {
@@ -121,7 +120,6 @@
                 try {
                     const response = await fetch(searchUrl, {
                         headers: {
-                            // Use the authentication token here for authorization
                             'Authorization': `Token ${authToken}`
                         }
                     });

@@ -79,6 +79,7 @@ WSGI_APPLICATION = 'loan_management_system.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Using MySQL as the database backend
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',

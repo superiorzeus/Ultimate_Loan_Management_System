@@ -14,7 +14,6 @@
             background-color: #f3f4f6;
             color: #1f2937;
         }
-        /* Style for the button's hover effect */
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
@@ -28,7 +27,6 @@
         
         <!-- Login Form -->
         <form method="post" action="{% url 'login' %}">
-            <!-- Django's CSRF token -->
             {% csrf_token %}
             
             <div class="space-y-4">
