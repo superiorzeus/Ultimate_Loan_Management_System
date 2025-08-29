@@ -50,7 +50,7 @@
     <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div class="mb-4 md:mb-0">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p class="text-lg text-gray-600">Welcome, {{ user.username }}!</p>
+            <p class="text-lg text-gray-600">Welcome, {{ user.name }}!</p>
         </div>
         <form action="{% url 'logout' %}" method="post">
             {% csrf_token %}

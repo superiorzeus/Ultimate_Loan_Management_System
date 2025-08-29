@@ -3,7 +3,8 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.utils import timezone
 import uuid
 
-# A custom user manager to handle user creation with username and phone number
+
+# A custom user manager to handle user creation
 class CustomUserManager(BaseUserManager):
     def create_user(self, username, phone_number, password=None, **extra_fields):
         if not phone_number:
@@ -29,8 +30,8 @@ class CustomUserManager(BaseUserManager):
             
         return self.create_user(username, phone_number, password, **extra_fields)
 
+
 # User Model
-# This is our custom user model that uses username for authentication
 class User(AbstractBaseUser, PermissionsMixin):
     name = models.CharField(max_length=255)
     username = models.CharField(max_length=255, unique=True)
@@ -48,8 +49,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.username
-    
-    # Check if the user is a full admin with staff and superuser permissions
+    # Check if the user is a full admin (staff and superuser)    
     @property
     def is_full_admin(self):
         return self.is_staff and self.is_superuser
@@ -59,8 +59,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     def is_admin_only(self):
         return self.is_admin and not self.is_superuser
 
-# Customer Profile Model
-# This model holds the additional details for a customer user
+
+# Customer Profile Model - One-to-One with User
 class CustomerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='customer_profile')
     national_id = models.CharField(max_length=100)
@@ -74,8 +74,8 @@ class CustomerProfile(models.Model):
     def __str__(self):
         return f"Profile for {self.user.username}"
 
-# Loan Type Model
-# This model allows admins to define different loan products
+
+# Loan Type Model - Defines different types of loans
 class LoanType(models.Model):
     INTEREST_RATE_CHOICES = [
         ('flat_rate', 'Flat Rate'),
@@ -90,8 +90,7 @@ class LoanType(models.Model):
     def __str__(self):
         return self.name
 
-# Loan Application Model
-# This model stores a customer's loan request.
+# Loan Application Model - Submitted by customers
 class LoanApplication(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -100,7 +99,7 @@ class LoanApplication(models.Model):
         ('rejected', 'Rejected'),
     ]
     
-    # A foreign key to the User who submitted the application
+    # A foreign key to the user who submitted the application
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     # A foreign key to the type of loan being applied for
     loan_type = models.ForeignKey(LoanType, on_delete=models.CASCADE)
@@ -115,8 +114,8 @@ class LoanApplication(models.Model):
     def __str__(self):
         return f"Loan application by {self.user.username} for {self.loan_type.name}"
 
-# Loan Model
-# This model represents an approved loan with its own details.
+
+# Loan Model - Created upon approval of a LoanApplication
 class Loan(models.Model):
     # A one-to-one relationship with the approved LoanApplication
     application = models.OneToOneField(LoanApplication, on_delete=models.CASCADE, primary_key=True)
@@ -132,9 +131,9 @@ class Loan(models.Model):
     def __str__(self):
         return f"Loan for {self.application.user.username} - GHS{self.amount}"
 
-# A new model to store the payment schedule for a loan.
+
+# A model to store the payment schedule for a loan.
 class PaymentSchedule(models.Model):
-    # This foreign key links the schedule to a specific, approved loan.
     loan = models.ForeignKey(Loan, on_delete=models.CASCADE, related_name='payment_schedule')
     due_date = models.DateField()
     due_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -157,13 +156,11 @@ class PaymentSchedule(models.Model):
         return self.due_date < timezone.now().date() and not self.is_paid
 
 
-# Payment Model
-# This model stores all the payments made towards a specific loan.
+# Payment Model - Records payments made towards a PaymentSchedule
 class Payment(models.Model):
     payment_schedule = models.ForeignKey(PaymentSchedule, on_delete=models.CASCADE, related_name='payments')
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_date = models.DateTimeField(auto_now_add=True)
-    # New field to record which admin processed the payment
+    payment_date = models.DateField(default=timezone.now)
     recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_payments')
     # Using UUIDField for a unique, hard-to-guess transaction ID.
     transaction_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)

@@ -19,7 +19,7 @@ from decimal import Decimal
 import uuid
 
 # Django Rest Framework imports
-from rest_framework import viewsets, status, permissions, mixins
+from rest_framework import viewsets, status, permissions, mixins, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view
@@ -436,47 +436,100 @@ class LoanViewSet(viewsets.ModelViewSet):
 #         headers = self.get_success_headers(serializer.data)
 #         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-# A ViewSet for managing payment-related operations.
+# # A ViewSet for managing payment-related operations.
+# class PaymentViewSet(viewsets.ModelViewSet):
+#     """
+#     ViewSet for managing payments.
+#     Admins can create and view all payments.
+#     Customers can only view payments related to their loans.
+#     """
+#     # The queryset is now configured to pre-fetch related data,
+#     # which is essential to avoid the "null" issue for the loan_id.
+#     queryset = Payment.objects.all().select_related('payment_schedule__loan')
+#     serializer_class = PaymentSerializer
+#     permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         """
+#         Filters the payments queryset based on the user's role.
+#         """
+#         # Admins can view all payments. We use select_related for efficiency.
+#         if self.request.user.is_staff:
+#             return Payment.objects.all().select_related('payment_schedule__loan')
+
+#         # Customers can only view payments related to their loans.
+#         # We also use select_related here to ensure the loan_id field is populated.
+#         return Payment.objects.filter(
+#             payment_schedule__loan__application__user=self.request.user
+#         ).select_related('payment_schedule__loan')
+
+#     # The custom `create` method has been removed.
+#     # The default DRF `perform_create` method is sufficient and more robust.
+#     # The permission check for `is_staff` is now handled by the `perform_create`
+#     # method in a more standard way.
+
+#     def perform_create(self, serializer):
+#         # We perform the admin check here, as this is the standard DRF hook for creation logic.
+#         if not self.request.user.is_staff:
+#             # Raising a permission denied exception is the standard DRF way
+#             # to handle this, which returns a 403 Forbidden response.
+#             raise permissions.PermissionDenied("You do not have permission to perform this action.")
+        
+#         # The serializer.save() call handles all the business logic defined in your serializer.
+#         serializer.save()
+
+ # A ViewSet for managing payment-related operations.
+# class PaymentViewSet(viewsets.ReadOnlyModelViewSet):  # 👈 only read operations
+#     """
+#     ViewSet for viewing payments.
+#     Admins can view all payments.
+#     Customers can only view payments related to their loans.
+#     """
+#     queryset = Payment.objects.all().select_related('payment_schedule__loan')
+#     serializer_class = PaymentSerializer
+#     permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         if self.request.user.is_staff:
+#             return Payment.objects.all().select_related('payment_schedule__loan')
+#         return Payment.objects.filter(
+#             payment_schedule__loan__application__user=self.request.user
+#         ).select_related('payment_schedule__loan')
+
 class PaymentViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing payments.
-    Admins can create and view all payments.
-    Customers can only view payments related to their loans.
+    - Admins: can create and view all payments
+    - Customers: can only view their own payments
     """
-    # The queryset is now configured to pre-fetch related data,
-    # which is essential to avoid the "null" issue for the loan_id.
     queryset = Payment.objects.all().select_related('payment_schedule__loan')
     serializer_class = PaymentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Filters the payments queryset based on the user's role.
-        """
-        # Admins can view all payments. We use select_related for efficiency.
-        if self.request.user.is_staff:
+        user = self.request.user
+        if user.is_staff:
+            # Admins see all payments
             return Payment.objects.all().select_related('payment_schedule__loan')
-
-        # Customers can only view payments related to their loans.
-        # We also use select_related here to ensure the loan_id field is populated.
+        # Customers only see their own payments
         return Payment.objects.filter(
-            payment_schedule__loan__application__user=self.request.user
+            payment_schedule__loan__application__user=user
         ).select_related('payment_schedule__loan')
 
-    # The custom `create` method has been removed.
-    # The default DRF `perform_create` method is sufficient and more robust.
-    # The permission check for `is_staff` is now handled by the `perform_create`
-    # method in a more standard way.
-
     def perform_create(self, serializer):
-        # We perform the admin check here, as this is the standard DRF hook for creation logic.
+        """
+        Only admins can create payments through /api/payments/.
+        Customers must use /api/loans/<loan_pk>/payments/ instead.
+        """
         if not self.request.user.is_staff:
-            # Raising a permission denied exception is the standard DRF way
-            # to handle this, which returns a 403 Forbidden response.
-            raise permissions.PermissionDenied("You do not have permission to perform this action.")
-        
-        # The serializer.save() call handles all the business logic defined in your serializer.
+            raise PermissionDenied("You cannot create payments here. Use /api/loans/<loan_pk>/payments/ instead.")
         serializer.save()
+
+ # A view to create payments (only for admins)
+class PaymentCreateAPIView(generics.CreateAPIView):
+    serializer_class = PaymentSerializer
+    queryset = Payment.objects.all()
+    permission_classes = [IsAuthenticated]
 
 
 # A ViewSet for a customer to manage their user details and profile.

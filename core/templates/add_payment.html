@@ -93,6 +93,7 @@
             const paymentFormContainer = document.getElementById('paymentFormContainer');
             const messageDiv = document.getElementById('messageDiv');
             const paymentForm = document.getElementById('paymentForm');
+            let selectedLoan = null;
 
             // Get the CSRF token from the meta tag created by Django
             const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
@@ -160,6 +161,8 @@
             });
 
             function displayLoanDetails(loan) {
+
+                selectedLoan = loan;
                 // Use loan.application instead of loan.id
                 document.getElementById('loanIdDisplay').textContent = loan.application;
                 document.getElementById('customerNameDisplay').textContent = loan.customer_name;
@@ -174,14 +177,22 @@
             paymentForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
 
+                // Check if a loan has been selected
+                if (!selectedLoan) {
+                    messageDiv.style.display = 'block';
+                    messageDiv.className = 'mt-4 p-4 rounded-md text-sm bg-red-100 text-red-700';
+                    messageDiv.textContent = 'Please select a loan first.';
+                    return;
+                }
+
                 const formData = new FormData(paymentForm);
                 const paymentPayload = {
                     amount_paid: formData.get('amount_paid'),
                     payment_date: formData.get('payment_date'),
-                    loan_pk: formData.get('loan_pk'),
+                    // loan_pk: selectedLoan.application,
                 };
 
-                const paymentUrl = `/api/payments/`;
+                const paymentUrl = `/api/loans/${selectedLoan.application}/payments/`;
                 
                 try {
                     const response = await fetch(paymentUrl, {

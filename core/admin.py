@@ -10,7 +10,7 @@ class PaymentScheduleInline(admin.TabularInline):
     This allows admins to see and manage payments directly from the Loan detail page.
     """
     model = PaymentSchedule
-    extra = 0 # Prevents extra empty forms from being displayed
+    extra = 0 
     readonly_fields = ('due_date', 'due_amount', 'is_paid', 'date_paid', 'principal_due', 'interest_due')
     can_delete = False
 
@@ -22,27 +22,19 @@ class LoanAdmin(admin.ModelAdmin):
     and a custom inline for payment schedules.
     """
     # The list_display property controls which fields are shown on the list page.
-    list_display = ('application', 'amount', 'balance', 'disbursed', 'disbursement_date')
-    
-    # readonly_fields makes sure that these fields cannot be edited in the admin panel.
-    readonly_fields = ('application', 'amount', 'interest_rate', 'term_months', 'balance', 'end_date', 'disbursement_date')
-    
-    # Use fieldsets to group the fields logically in the detail view.
+    list_display = ('application', 'amount', 'balance', 'disbursed', 'disbursement_date')    
+    readonly_fields = ('application', 'amount', 'interest_rate', 'term_months', 'balance', 'end_date', 'disbursement_date')    
     fieldsets = (
         (None, {
             'fields': ('application', 'amount', 'interest_rate', 'term_months', 'balance', 'end_date', 'disbursed', 'disbursement_date')
         }),
     )
 
-    # Add the PaymentScheduleInline to this admin class.
     inlines = [PaymentScheduleInline]
 
-    # This method dynamically sets which fields are read-only.
     def get_readonly_fields(self, request, obj=None):
-        # If the object exists and the loan is disbursed, make the 'disbursed' field read-only.
         if obj and obj.disbursed:
             return self.readonly_fields + ('disbursed',)
-        # Otherwise, return the default read-only fields.
         return self.readonly_fields
 
 
@@ -55,7 +47,7 @@ class PaymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'payment_schedule', 'amount_paid', 'payment_date', 'recorded_by')
 
 
-# Register your models here.
+# Register the models with the admin site.
 admin.site.register(User)
 admin.site.register(CustomerProfile)
 admin.site.register(LoanType)
