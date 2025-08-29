@@ -1,5 +1,5 @@
-Ultimate Loan Management System API Documentation
-This document provides a detailed overview and the RESTful API endpoints for the Loan Management System.
+Ultimate Loan Management System Documentation
+This document provides a detailed overview of the system and the RESTful API endpoints for the Loan Management System.
 
 Project Setup - Follow these steps to set up the project locally:
     Prerequisites - Make sure you have the following installed on your system:
